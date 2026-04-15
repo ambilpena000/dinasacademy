@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/multer": "^2.1.0",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/react-slick": "^0.23.13"
+  },
+  "dependencies": {
+    "@nestjs/config": "^4.0.3",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.18",
+    "@nestjs/typeorm": "^11.0.1",
+    "bcryptjs": "^3.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "multer": "^2.1.1",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.20.0",
+    "typeorm": "^0.3.28"
+  }
+}

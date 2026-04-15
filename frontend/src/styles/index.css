@@ -1,0 +1,35 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Slick Carousel Custom Styling */
+.slick-dots li button:before {
+  display: none !important;
+}
+
+.slick-dots li {
+  margin: 0 4px !important;
+}
+
+.slick-dots li.slick-active > div {
+  background: linear-gradient(to right, #2563EB, #3B82F6) !important;
+  width: 24px !important;
+  border-radius: 6px !important;
+}
+
+.slick-slide > div {
+  height: 100%;
+}
+
+.slick-track {
+  display: flex !important;
+  gap: 0 !important;
+}
+
+.slick-slide {
+  height: inherit !important;
+}
+
+.slick-slide > div > div {
+  height: 100%;
+}
