@@ -8,6 +8,7 @@ import {
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
 import { mockTryOuts, mockQuestions } from '../data/mockData';
+import { api } from '../lib/api';
 
 // ── Subtes SNBT 2026 (urutan & durasi sesuai regulasi) ────────────
 const SNBT_SUBTESTS = [
@@ -144,34 +145,57 @@ export default function TryOutExamPage() {
   const globalIdx = currentRange.start + currentQuestion;
 
   // ── Init timer on subtest change ─────────────────────────────
-  useEffect(() => {
-    if (!currentSubtest) return;
-    setSubtestTimer(currentSubtest.duration * 60);
-    setCurrentQuestion(0);
-  }, [currentSubtestIdx]);
-
-  // ── Timer countdown ───────────────────────────────────────────
   const goNextSubtest = useCallback(() => {
     if (currentSubtestIdx < subtests.length - 1) setShowTransition(true);
     else setShowFinish(true);
   }, [currentSubtestIdx, subtests.length]);
 
   useEffect(() => {
+    if (!currentSubtest) return;
+    const initialTime = currentSubtest.duration * 60;
+    setSubtestTimer(initialTime);
+    setCurrentQuestion(0);
+
+    // Start countdown immediately with initialTime (tidak tunggu state update)
     if (timerRef.current) clearInterval(timerRef.current);
-    if (subtestTimer <= 0) return;
+    let remaining = initialTime;
     timerRef.current = setInterval(() => {
-      setSubtestTimer(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); goNextSubtest(); return 0; }
-        return prev - 1;
-      });
+      remaining -= 1;
+      setSubtestTimer(remaining);
+      if (remaining <= 0) {
+        clearInterval(timerRef.current!);
+        timerRef.current = null;
+        // Trigger next subtest via state — pakai setTimeout agar tidak conflict dengan render
+        setTimeout(() => {
+          setCurrentSubtestIdx((prev : number) => {
+            if (prev < subtests.length - 1) {
+              setShowTransition(true);
+            } else {
+              setShowFinish(true);
+            }
+            return prev;
+          });
+        }, 100);
+      }
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [currentSubtestIdx, goNextSubtest]);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [currentSubtestIdx, subtests.length]);
 
   // ── Auto-save ─────────────────────────────────────────────────
   const saveProgress = useCallback(() => {
     if (!id) return;
     localStorage.setItem(getSaveKey(id), JSON.stringify({ answers, currentSubtestIdx, savedAt: new Date().toISOString() }));
+    // Sinkron draft ke backend
+    const token = localStorage.getItem('access_token');
+    if (token && id) {
+      api.saveDraft(id, answers, currentSubtestIdx).catch(() => {});
+    }
     setLastSaved(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
   }, [id, answers, currentSubtestIdx]);
 

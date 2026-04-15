@@ -9,13 +9,23 @@ import {
 import { mockTryOuts, mockScores } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 
+// Hook sederhana untuk mengambil hasil dari localStorage (fallback)
+const useLocalResults = () => {
+  const [results, setResults] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    const raw = localStorage.getItem('exam_results');
+    setResults(raw ? JSON.parse(raw) : []);
+  }, []);
+  return results;
+};
+
 export default function DashboardPage() {
   const { user: authUser } = useAuth();
+  const backendResults = useLocalResults(); // ✅ perbaikan: state lokal
 
   const examResults = React.useMemo(() => {
-    const raw = localStorage.getItem('exam_results');
-    return raw ? JSON.parse(raw) : [];
-  }, []);
+    return backendResults.length > 0 ? backendResults : mockScores;
+  }, [backendResults]);
 
   const completedIds: string[] = React.useMemo(() => {
     const raw = localStorage.getItem('completed_tryouts');
@@ -47,8 +57,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 pb-8">
-
-      {/* ── Hero Banner ── */}
+      {/* Hero Banner */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -84,7 +93,7 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Stat Cards (3 kolom) ── */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-4 items-stretch">
         {[
           {
@@ -133,9 +142,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-
-
-      {/* ── Target ── */}
+      {/* Target */}
       {authUser?.targetUniversity && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -156,7 +163,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* ── Hasil Terakhir ── */}
+      {/* Hasil Terakhir */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
@@ -186,7 +193,6 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              {/* Skor utama */}
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[
                   { label: 'Total Skor', value: recentScore.totalScore, blue: true },
@@ -201,7 +207,6 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              {/* Sub-scores */}
               {recentScore.subScores && recentScore.subScores.length > 0 && (
                 <div className="space-y-3 mb-5">
                   {recentScore.subScores.slice(0, 4).map((sub: any) => {
@@ -244,7 +249,7 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Try Out Tersedia ── */}
+      {/* Try Out Tersedia */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
@@ -303,7 +308,7 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Riwayat Skor ── */}
+      {/* Riwayat Skor */}
       {displayResults.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -337,7 +342,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* ── CTA Beli Paket ── */}
+      {/* CTA Beli Paket */}
       {!authUser?.hasPurchasedPackage && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <div className="relative bg-[#1e40af] rounded-2xl p-6 overflow-hidden">

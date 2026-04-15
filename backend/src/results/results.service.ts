@@ -7,47 +7,26 @@ import { ExamResult } from './exam-result.entity';
 export class ResultsService {
   constructor(
     @InjectRepository(ExamResult)
-    private resultsRepo: Repository<ExamResult>,
+    private resultRepo: Repository<ExamResult>,
   ) {}
 
-  async save(data: Partial<ExamResult>): Promise<ExamResult> {
-    await this.resultsRepo.delete({ userId: data.userId, tryoutId: data.tryoutId });
-    const result = this.resultsRepo.create(data);
-    return this.resultsRepo.save(result);
+  async getUserResults(userId: number) {
+    return this.resultRepo.find({ where: { userId } });
   }
 
-  async findByUser(userId: string): Promise<ExamResult[]> {
-    return this.resultsRepo.find({
-      where: { userId },
-      order: { completedAt: 'DESC' },
-    });
+  async getResultByTryout(userId: number, tryoutId: number) {
+    return this.resultRepo.findOne({ where: { userId, tryoutId } });
   }
 
-  async findOne(userId: string, tryoutId: string): Promise<ExamResult | null> {  // Fix: tambah | null
-    return this.resultsRepo.findOne({ where: { userId, tryoutId } });
-  }
-
-  async getRanking(tryoutId: string): Promise<{
-    entries: any[];
-    totalParticipants: number;
-  }> {
-    const results = await this.resultsRepo.find({
+  async getRanking(tryoutId: number) {
+    return this.resultRepo.find({
       where: { tryoutId },
       order: { totalScore: 'DESC' },
-      select: ['id', 'userId', 'totalScore', 'percentage', 'completedAt'],
     });
-
-    const entries = results.map((r, index) => ({
-      rank: index + 1,
-      userId: r.userId,
-      score: r.totalScore,
-      percentage: r.percentage,
-    }));
-
-    return { entries, totalParticipants: results.length };
   }
 
-  async findAll(): Promise<ExamResult[]> {
-    return this.resultsRepo.find({ order: { completedAt: 'DESC' } });
+  async createResult(data: Partial<ExamResult>) {
+    const result = this.resultRepo.create(data);
+    return this.resultRepo.save(result);
   }
 }

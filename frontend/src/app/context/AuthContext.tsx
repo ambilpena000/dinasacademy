@@ -84,6 +84,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('orders', JSON.stringify(newOrders));
   };
 
+  // Fetch orders dari backend saat pertama load (jika sudah login)
+  React.useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    api.getAllOrders()
+      .then((data: any[]) => {
+        if (data && data.length > 0) {
+          // Map format backend ke format frontend
+          const mapped: Order[] = data.map((o: any) => ({
+            id: o.id,
+            userId: o.userId,
+            userName: o.user?.name || o.userName || '',
+            userEmail: o.user?.email || o.userEmail || '',
+            packageType: o.packageType,
+            packageName: o.packageName,
+            amount: o.amount,
+            uniqueCode: o.uniqueCode,
+            totalAmount: o.totalAmount,
+            paymentMethod: o.paymentMethod,
+            status: o.status,
+            createdAt: o.createdAt,
+          }));
+          setOrders(mapped);
+          localStorage.setItem('orders', JSON.stringify(mapped));
+        }
+      })
+      .catch(() => {}); // fallback ke localStorage jika backend belum siap
+  }, [user]);
+
   // ── LOGIN: pakai backend API ──────────────────────────────────
   const login = async (email: string, password: string) => {
     try {
@@ -192,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem('all_users', JSON.stringify(updatedAllUsers));
 
-    // Juga sinkron ke backend
+    // Simpan ke backend PostgreSQL
     api.activateOrder(orderId).catch(() => {});
   };
 
@@ -221,12 +250,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     saveOrders([newOrder, ...orders]);
 
-    // Sinkron ke backend
+    // Simpan ke backend PostgreSQL
     api.createOrder({
       packageName: order.packageName,
       packageType: order.packageType,
       amount: order.amount,
       paymentMethod: order.paymentMethod,
+    }).then((saved: any) => {
+      // Update ID lokal dengan ID dari backend
+      if (saved?.id) {
+        setOrders(prev => prev.map(o =>
+          o.id === newOrder.id ? { ...o, id: saved.id } : o
+        ));
+      }
     }).catch(() => {});
   };
 
@@ -245,4 +281,4 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
-} 
+}

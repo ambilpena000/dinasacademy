@@ -3,35 +3,35 @@ import {
   CreateDateColumn, OneToMany
 } from 'typeorm';
 
-@Entity('tryouts')
+@Entity()
 export class Tryout {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  title: string;
+  title!: string;
 
-  @Column({ nullable: true, type: 'text' })
-  description: string;
-
-  @Column()
-  category: string; // 'PTN' | 'SKD' | 'STIS'
-
-  @Column({ default: 'Sedang' })
-  difficulty: string; // 'Mudah' | 'Sedang' | 'Sulit'
+  @Column('text')
+  description!: string;
 
   @Column()
-  duration: number; // total menit
+  category!: string;
 
-  @Column({ default: 0 })
-  totalQuestions: number;
+  @Column()
+  difficulty!: string;
+
+  @Column()
+  duration!: number; // menit
+
+  @Column()
+  totalQuestions!: number;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @Column({ default: false })
-  isLocked: boolean;
+  isLocked!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

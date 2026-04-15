@@ -4,53 +4,50 @@ import {
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
-@Entity('users')
+@Entity()
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  name: string;
+  name!: string;
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column()
-  @Exclude() // password tidak pernah dikirim ke frontend
-  password: string;
+  password!: string;
 
-  @Column({ default: 'user' })
-  role: string; // 'user' | 'admin'
-
-  @Column({ nullable: true })
-  photoUrl: string;
-
-  // ── Profil ────────────────────────────────────────
-  @Column({ nullable: true })
-  targetType: string; // 'PTN' | 'Sekdin'
+  @Column({ default: 'student' })
+  role!: string;
 
   @Column({ nullable: true })
-  targetUniversity: string;
+  photoUrl?: string;
 
   @Column({ nullable: true })
-  targetMajor: string;
+  targetType?: string;
 
-  @Column({ nullable: true, type: 'text' })
-  goals: string;
+  @Column({ nullable: true })
+  targetUniversity?: string;
+
+  @Column({ nullable: true })
+  targetMajor?: string;
+
+  @Column('text', { nullable: true })
+  goals?: string;
 
   @Column({ default: false })
-  profileCompleted: boolean;
+  profileCompleted!: boolean;
 
-  // ── Paket ─────────────────────────────────────────
   @Column({ default: false })
-  hasPurchasedPackage: boolean;
+  hasPurchasedPackage!: boolean;
 
   @Column({ nullable: true })
-  packageType: string; // 'PTN Premium' | 'SKD' | 'STIS'
+  packageType?: string;
 
   @CreateDateColumn()
-  joinDate: Date;
+  joinDate!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

@@ -1,37 +1,37 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
-@Entity('packages')
-export class PackageEntity {   // Ganti nama: Package → PackageEntity
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+@Entity()
+export class Package {
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  name: string;
+  name!: string;
 
-  @Column({ nullable: true, type: 'text' })
-  description: string;
+  @Column('text')
+  description!: string;
 
-  @Column()
-  price: number;
-
-  @Column({ nullable: true })
-  duration: string;
+  @Column('decimal')
+  price!: number;
 
   @Column()
-  track: string;
+  duration!: number; // dalam hari
 
   @Column()
-  type: string;
+  track!: string;
 
-  @Column({ type: 'text', array: true, default: '{}' })
-  features: string[];
+  @Column()
+  type!: string;
 
-  @Column({ default: 0 })
-  includedTryouts: number;
+  @Column('simple-array')
+  features!: string[];
+
+  @Column('simple-array')
+  includedTryouts!: string[];
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

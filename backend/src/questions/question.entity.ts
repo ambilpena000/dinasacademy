@@ -2,47 +2,47 @@ import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn
 } from 'typeorm';
 
-@Entity('questions')
+@Entity()
 export class Question {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  tryoutId: string;
-
-  @Column({ nullable: true })
-  subtestCode: string; // 'PU' | 'PPU' | 'TWK' | 'TIU' | 'TKP' dst
-
-  @Column({ nullable: true })
-  subtestName: string;
-
-  @Column({ type: 'text' })
-  questionText: string;
-
-  @Column({ type: 'text' })
-  optionA: string;
-
-  @Column({ type: 'text' })
-  optionB: string;
-
-  @Column({ type: 'text' })
-  optionC: string;
-
-  @Column({ type: 'text' })
-  optionD: string;
-
-  @Column({ type: 'text', nullable: true })
-  optionE: string;
+  tryoutId!: number;
 
   @Column()
-  correctAnswer: string; // 'a' | 'b' | 'c' | 'd' | 'e'
+  subtestCode!: string;
 
-  @Column({ type: 'text', nullable: true })
-  explanation: string; // pembahasan soal
+  @Column()
+  subtestName!: string;
 
-  @Column({ default: 0 })
-  orderIndex: number;
+  @Column('text')
+  questionText!: string;
+
+  @Column('text')
+  optionA!: string;
+
+  @Column('text')
+  optionB!: string;
+
+  @Column('text')
+  optionC!: string;
+
+  @Column('text')
+  optionD!: string;
+
+  @Column('text')
+  optionE!: string;
+
+  @Column()
+  correctAnswer!: string; // misal 'A'
+
+  @Column('text', { nullable: true })
+  explanation?: string;
+
+  @Column()
+  orderIndex!: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

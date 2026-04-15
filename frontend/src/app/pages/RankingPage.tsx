@@ -1,4 +1,5 @@
-import React from 'react';
+import { api } from '../lib/api';
+import React, { useEffect } from 'react';
 import { useParams, Link } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Trophy, Medal, Crown, User } from 'lucide-react';
@@ -10,7 +11,6 @@ function generateLeaderboard(tryOutId: string, userRank: number, userScore: numb
   const seed = tryOutId.charCodeAt(0) + tryOutId.charCodeAt(tryOutId.length - 1);
   const totalParticipants = 800 + (seed % 1200);
 
-  // Generate 20 peserta di sekitar ranking user
   const entries: { rank: number; name: string; score: number; isUser: boolean }[] = [];
 
   const names = [
@@ -82,6 +82,14 @@ export default function RankingPage() {
   const { id } = useParams();
   const { user } = useAuth();
 
+  // Fetch ranking dari backend (optional)
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (id && token) {
+      api.getRanking(id).catch(() => {});
+    }
+  }, [id]);
+
   const tryOut = mockTryOuts.find(t => t.id === id);
 
   // Ambil hasil try out user dari localStorage
@@ -117,8 +125,7 @@ export default function RankingPage() {
 
   return (
     <div className="space-y-5 pb-8">
-
-      {/* ── Header ── */}
+      {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <Link to="/hasil" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Kembali ke Hasil
@@ -138,7 +145,7 @@ export default function RankingPage() {
         </div>
       </motion.div>
 
-      {/* ── Posisi Kamu ── */}
+      {/* Posisi Kamu */}
       {userEntry && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -156,12 +163,11 @@ export default function RankingPage() {
                 <p className="text-xs text-gray-400">dari {totalParticipants.toLocaleString('id-ID')}</p>
               </div>
             </div>
-
           </div>
         </motion.div>
       )}
 
-      {/* ── Leaderboard ── */}
+      {/* Leaderboard */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50">
@@ -203,7 +209,7 @@ export default function RankingPage() {
               </motion.div>
             ))}
 
-            {/* Separator jika ada gap */}
+            {/* Separator */}
             {showSeparator && (
               <div className="flex items-center gap-2 px-3 py-1">
                 <div className="flex-1 border-t border-dashed border-gray-200" />
@@ -252,7 +258,7 @@ export default function RankingPage() {
         </div>
       </motion.div>
 
-      {/* ── Actions ── */}
+      {/* Actions */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
         className="flex gap-3">
         <Link to={`/tryout/${id}/pembahasan`} className="flex-1">

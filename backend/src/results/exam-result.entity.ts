@@ -2,56 +2,56 @@ import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn
 } from 'typeorm';
 
-@Entity('exam_results')
+@Entity()
 export class ExamResult {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  userId: string;
+  userId!: number;
 
   @Column()
-  tryoutId: string;
+  tryoutId!: number;
 
   @Column()
-  tryoutTitle: string;
+  tryoutTitle!: string;
 
   @Column()
-  category: string;
+  category!: string;
 
-  @Column({ type: 'jsonb', default: '{}' })
-  answers: Record<string, string>; // { "0": "a", "1": "c", ... }
+  @Column('json')
+  answers!: object;
 
-  @Column({ default: 0 })
-  correct: number;
+  @Column()
+  correct!: number;
 
-  @Column({ default: 0 })
-  wrong: number;
+  @Column()
+  wrong!: number;
 
-  @Column({ default: 0 })
-  unanswered: number;
+  @Column()
+  unanswered!: number;
 
-  @Column({ default: 0 })
-  totalQuestions: number;
+  @Column()
+  totalQuestions!: number;
 
-  @Column({ default: 0 })
-  totalScore: number;
+  @Column('decimal')
+  totalScore!: number;
 
-  @Column({ default: 1000 })
-  maxScore: number;
+  @Column('decimal')
+  maxScore!: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  percentage: number;
+  @Column('decimal')
+  percentage!: number;
 
-  @Column({ nullable: true })
-  rank: number;
+  @Column()
+  rank!: number;
 
-  @Column({ nullable: true })
-  totalParticipants: number;
+  @Column()
+  totalParticipants!: number;
 
-  @Column({ type: 'jsonb', default: '[]' })
-  subScores: any[]; // skor per subtes
+  @Column('json')
+  subScores!: object;
 
   @CreateDateColumn()
-  completedAt: Date;
+  completedAt!: Date;
 }

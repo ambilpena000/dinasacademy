@@ -1,26 +1,23 @@
 // exam-draft.entity.ts
-import {
-  Entity, Column, PrimaryGeneratedColumn, UpdateDateColumn, Unique
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('exam_drafts')
-@Unique(['userId', 'tryoutId'])
+@Entity()
 export class ExamDraft {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  userId: string;
+  userId!: number;
 
   @Column()
-  tryoutId: string;
+  tryoutId!: number;
 
-  @Column({ type: 'jsonb', default: '{}' })
-  answers: Record<string, string>;
+  @Column('json')
+  answers!: object; // atau tipe yang sesuai
 
-  @Column({ default: 0 })
-  currentSubtest: number;
+  @Column()
+  currentSubtest!: string;
 
-  @UpdateDateColumn()
-  savedAt: Date;
+  @Column()
+  savedAt!: Date;
 }

@@ -1,7 +1,5 @@
 // Ambil URL backend dari environment variable, fallback ke localhost
-const BASE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL)
-  ? (import.meta as any).env.VITE_API_URL
-  : 'http://localhost:3000/api';
+const BASE_URL = 'http://localhost:3000/api';
 
 async function request(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('access_token');

@@ -12,14 +12,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { mockScores } from '../data/mockData';
+import { useResults } from '../hooks/useResults';
 import { universities, getPrograms, getPassingGradeStatus, PASSING_GRADE_DISCLAIMER } from '../data/universities';
 
 export default function HasilPage() {
+  const { results: backendResults } = useResults();
 
 
   // Read real exam results from localStorage, fall back to mockScores
   const realResults = React.useMemo(() => {
-    const raw = localStorage.getItem('exam_results');
+    const raw = backendResults.length > 0 ? JSON.stringify(backendResults) : localStorage.getItem('exam_results');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.length > 0) return parsed;

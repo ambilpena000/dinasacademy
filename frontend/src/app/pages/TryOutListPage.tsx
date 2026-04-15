@@ -6,6 +6,7 @@ import {
   CheckCircle, Play, ChevronRight, AlertCircle
 } from 'lucide-react';
 import { mockTryOuts, TryOut } from '../data/mockData';
+import { useTryouts } from '../hooks/useTryouts';
 import { useAuth } from '../context/AuthContext';
 
 export default function TryOutListPage() {
@@ -19,7 +20,8 @@ export default function TryOutListPage() {
   }, []);
 
   // Merge completion status
-  const tryOuts = mockTryOuts.map(t => ({
+  const { tryouts: backendTryouts, loading: tryoutsLoading } = useTryouts();
+  const tryOuts = (backendTryouts.length > 0 ? backendTryouts : mockTryOuts).map(t => ({
     ...t,
     isCompleted: completedIds.includes(t.id) || t.isCompleted,
   }));
@@ -194,7 +196,7 @@ export default function TryOutListPage() {
                 <div className="px-5 pb-3">
                   <p className="text-xs text-gray-400 mb-1.5">Materi:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {tryOut.subjects.slice(0, 4).map((sub, j) => (
+                    {tryOut.subjects.slice(0, 4).map((sub: any, j: number) => (
                       <span key={j} className="text-xs bg-gray-50 border border-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-medium">
                         {typeof sub === 'string' ? sub : sub.code}
                       </span>

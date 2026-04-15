@@ -5,45 +5,45 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
-@Entity('orders')
+// order.entity.ts
+@Entity()
 export class Order {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   @Column()
-  userId: string;
+  userId!: number;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
   @Column()
-  packageName: string;
+  packageName!: string;
 
   @Column()
-  packageType: string;
+  packageType!: string;
+
+  @Column('decimal')
+  amount!: number;
 
   @Column()
-  amount: number; // harga paket
+  uniqueCode!: number;
+
+  @Column('decimal')
+  totalAmount!: number;
 
   @Column()
-  uniqueCode: number; // 3 digit dari user ID
+  paymentMethod!: string;
 
   @Column()
-  totalAmount: number; // amount + uniqueCode
-
-  @Column({ default: 'transfer' })
-  paymentMethod: string; // 'transfer' | 'ewallet'
-
-  @Column({ default: 'pending' })
-  status: string; // 'pending' | 'active' | 'rejected'
+  status!: string;
 
   @Column({ nullable: true })
-  activatedAt: Date;
+  activatedAt?: Date;
 
   @Column({ nullable: true })
-  activatedBy: string; // ID admin yang aktifkan
+  activatedBy?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

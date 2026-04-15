@@ -1,77 +1,48 @@
-// orders.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from './order.entity';
-import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
-    private ordersRepo: Repository<Order>,
-    private usersService: UsersService,
+    private orderRepo: Repository<Order>,
   ) {}
 
-  // Buat pesanan baru
-  async create(userId: string, dto: {
-    packageName: string;
-    packageType: string;
-    amount: number;
-    paymentMethod: string;
-  }): Promise<Order> {
-    // Generate kode unik dari user ID
-    const digits = userId.replace(/[^0-9a-f]/gi, '');
-    const num = parseInt(digits.slice(-4), 16);
-    const uniqueCode = (num % 900) + 100; // selalu 100-999
-
-    const order = this.ordersRepo.create({
+  async createOrder(userId: number, data: { packageName: string; packageType: string; amount: number; paymentMethod: string }) {
+    const uniqueCode = Math.floor(Math.random() * 100);
+    const totalAmount = data.amount + uniqueCode;
+    const order = this.orderRepo.create({
       userId,
-      ...dto,
+      packageName: data.packageName,
+      packageType: data.packageType,
+      amount: data.amount,
       uniqueCode,
-      totalAmount: dto.amount + uniqueCode,
+      totalAmount,
+      paymentMethod: data.paymentMethod,
       status: 'pending',
     });
-    return this.ordersRepo.save(order);
+    return this.orderRepo.save(order);
   }
 
-  // Ambil semua pesanan (admin)
-  async findAll(): Promise<Order[]> {
-    return this.ordersRepo.find({
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
-    });
+  async getUserOrders(userId: number) {
+    return this.orderRepo.find({ where: { userId } });
   }
 
-  // Ambil pesanan user tertentu
-  async findByUser(userId: string): Promise<Order[]> {
-    return this.ordersRepo.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    });
+  async handlePaymentWebhook(body: any) {
+    // implementasi sesuai kebutuhan
+    return { received: true };
   }
 
-  // Aktifkan pesanan (admin)
-  async activate(orderId: string, adminId: string): Promise<Order> {
-    const order = await this.ordersRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Pesanan tidak ditemukan');
-
-    order.status = 'active';
-    order.activatedAt = new Date();
-    order.activatedBy = adminId;
-    await this.ordersRepo.save(order);
-
-    // Aktifkan paket user
-    await this.usersService.activatePackage(order.userId, order.packageType);
-
+  async findOne(id: number) {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found');
     return order;
   }
 
-  // Tolak pesanan (admin)
-  async reject(orderId: string): Promise<Order> {
-    const order = await this.ordersRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Pesanan tidak ditemukan');
-    order.status = 'rejected';
-    return this.ordersRepo.save(order);
+  async updateStatus(id: number, status: string) {
+    await this.orderRepo.update(id, { status });
+    return this.findOne(id);
   }
 }
