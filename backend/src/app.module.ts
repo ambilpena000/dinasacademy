@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -11,16 +12,30 @@ import { PackagesModule } from './packages/packages.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'Maslangg06',   // pastikan sesuai password Anda
-      database: 'dinasacademy',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
+    // Load .env dari root backend (backend/.env)
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
     }),
+
+    // TypeORM menggunakan variabel dari .env via ConfigService
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get<string>('DB_HOST', 'localhost'),
+        port: config.get<number>('DB_PORT', 5432),
+        username: config.get<string>('DB_USERNAME', 'postgres'),
+        password: config.get<string>('DB_PASSWORD', ''),
+        database: config.get<string>('DB_NAME', 'dinasacademy'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        // WARNING: synchronize: true hanya untuk development!
+        // Di production, gunakan migrations.
+        synchronize: true,
+      }),
+    }),
+
     AuthModule,
     UsersModule,
     TryoutsModule,

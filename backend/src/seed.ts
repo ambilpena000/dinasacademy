@@ -1,16 +1,19 @@
+import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { Tryout } from './tryouts/tryout.entity';
 import { Question } from './questions/question.entity';
-import * as dotenv from 'dotenv';
-dotenv.config();
+
+// Load .env dari root backend (satu level di atas src/)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const AppDataSource = new DataSource({
   type: 'postgres',
-  host: 'localhost',
-  port: 5432,
-  username: 'postgres',
-  password: 'Maslangg06',
-  database: 'dinasacademy',   // ← pastikan ini 'dinasacademy', bukan 'postgres'
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  username: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'dinasacademy',
   entities: [Tryout, Question],
   synchronize: true,
 });

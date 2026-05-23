@@ -19,6 +19,7 @@ export class PackagesController {
   @UseGuards(JwtAuthGuard)
   @Post('purchase')
   purchase(@Request() req: any, @Body() body: { packageId: number }) {
-    return this.packagesService.purchase(req.user.userId, body.packageId);
+    // req.user.id berasal dari JwtStrategy.validate()
+    return this.packagesService.purchase(req.user.id, body.packageId);
   }
 }

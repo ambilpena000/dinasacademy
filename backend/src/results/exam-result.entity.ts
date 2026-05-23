@@ -43,15 +43,18 @@ export class ExamResult {
   @Column('decimal')
   percentage!: number;
 
-  @Column()
+  @Column({ default: 0 })
   rank!: number;
 
-  @Column()
+  @Column({ default: 1 })
   totalParticipants!: number;
 
-  @Column('json')
+  @Column('json', { nullable: true })
   subScores!: object;
 
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt?: Date;
+
   @CreateDateColumn()
-  completedAt!: Date;
+  createdAt!: Date;
 }

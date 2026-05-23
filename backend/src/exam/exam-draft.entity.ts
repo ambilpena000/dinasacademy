@@ -1,5 +1,5 @@
 // exam-draft.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity()
 export class ExamDraft {
@@ -13,11 +13,13 @@ export class ExamDraft {
   tryoutId!: number;
 
   @Column('json')
-  answers!: object; // atau tipe yang sesuai
+  answers!: object;
 
   @Column()
   currentSubtest!: string;
 
-  @Column()
+  // Menggunakan CreateDateColumn agar otomatis diset saat pertama kali create
+  // Bisa di-update manual saat save draft
+  @CreateDateColumn()
   savedAt!: Date;
 }

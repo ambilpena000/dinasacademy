@@ -1,8 +1,7 @@
 import {
   Entity, Column, PrimaryGeneratedColumn,
-  CreateDateColumn, UpdateDateColumn, OneToMany
+  CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
 
 @Entity()
 export class User {
@@ -15,7 +14,9 @@ export class User {
   @Column({ unique: true })
   email!: string;
 
-  @Column()
+  // Password TIDAK boleh dikembalikan ke response.
+  // Gunakan { select: false } agar TypeORM tidak otomatis load.
+  @Column({ select: false })
   password!: string;
 
   @Column({ default: 'student' })

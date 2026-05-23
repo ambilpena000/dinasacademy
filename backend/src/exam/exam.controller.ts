@@ -1,25 +1,43 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { ExamService } from './exam.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Request as ExpressRequest } from 'express';
 
 @Controller('exam')
 @UseGuards(JwtAuthGuard)
 export class ExamController {
   constructor(private examService: ExamService) {}
 
-  @Post('draft')
-  saveDraft(@Request() req: ExpressRequest & { user: { userId: number } }, @Body() body: any) {
-    return this.examService.saveDraft(req.user.userId, body);
+  // Frontend: GET /exam/:tryoutId/draft
+  @Get(':tryoutId/draft')
+  getDraft(@Request() req: any, @Param('tryoutId') tryoutId: string) {
+    return this.examService.getDraft(req.user.id, parseInt(tryoutId));
   }
 
-  @Get('draft/:tryoutId')
-  getDraft(@Request() req: ExpressRequest & { user: { userId: number } }, @Param('tryoutId') tryoutId: string) {
-    return this.examService.getDraft(req.user.userId, parseInt(tryoutId));
+  // Frontend: PUT /exam/:tryoutId/draft
+  @Put(':tryoutId/draft')
+  saveDraft(
+    @Request() req: any,
+    @Param('tryoutId') tryoutId: string,
+    @Body() body: any,
+  ) {
+    return this.examService.saveDraft(req.user.id, {
+      tryoutId: parseInt(tryoutId),
+      answers: body.answers,
+      currentSubtest: body.currentSubtest,
+    });
   }
 
-  @Post('submit')
-  submitExam(@Request() req: ExpressRequest & { user: { userId: number } }, @Body() body: any) {
-    return this.examService.submitExam(req.user.userId, body);
+  // Frontend: POST /exam/:tryoutId/submit
+  @Post(':tryoutId/submit')
+  submitExam(
+    @Request() req: any,
+    @Param('tryoutId') tryoutId: string,
+    @Body() body: any,
+  ) {
+    return this.examService.submitExam(req.user.id, {
+      tryoutId: parseInt(tryoutId),
+      answers: body.answers,
+      subScores: body.subScores,
+    });
   }
 }

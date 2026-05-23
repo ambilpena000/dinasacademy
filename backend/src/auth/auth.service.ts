@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
@@ -21,13 +21,13 @@ export class AuthService {
       name,
       email,
       password: hashedPassword,
-      role: 'user',
+      role: 'student', // Konsisten dengan default di User entity
     });
     return this.generateToken(user);
   }
 
   async login(email: string, password: string) {
-    // Admin hardcode (optional)
+    // Admin hardcode (optional, untuk development)
     if (email === 'admin@dinasacademy.id' && password === 'Admin123!') {
       return {
         access_token: this.jwtService.sign({ sub: 'admin', email, role: 'admin' }),
@@ -52,8 +52,25 @@ export class AuthService {
     return this.generateToken(user);
   }
 
+  // Endpoint /auth/me — mengembalikan data user lengkap
+  async getFullUser(userId: number | string) {
+    if (userId === 'admin') {
+      return { id: 'admin', name: 'Admin Dinas Academy', email: 'admin@dinasacademy.id', role: 'admin', hasPurchasedPackage: true };
+    }
+    const user = await this.usersService.findOne(Number(userId));
+    return {
+      id: user.id, name: user.name, email: user.email, role: user.role,
+      hasPurchasedPackage: user.hasPurchasedPackage, packageType: user.packageType,
+      targetType: user.targetType, targetUniversity: user.targetUniversity,
+      targetMajor: user.targetMajor, profileCompleted: user.profileCompleted,
+    };
+  }
+
   async changePassword(userId: number, oldPassword: string, newPassword: string) {
-    const user = await this.usersService.findOne(userId); // pakai findOne
+    const user = await this.usersService.findOneWithPassword(userId);
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) throw new UnauthorizedException('Password lama salah');
     const hashed = await bcrypt.hash(newPassword, 10);

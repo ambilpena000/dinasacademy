@@ -1,7 +1,4 @@
-import {
-  Entity, Column, PrimaryGeneratedColumn,
-  CreateDateColumn, OneToMany
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity()
 export class Tryout {

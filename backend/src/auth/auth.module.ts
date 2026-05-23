@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -10,9 +11,14 @@ import { UsersModule } from '../users/users.module';
   imports: [
     UsersModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dinasacademy_secret',
-      signOptions: { expiresIn: '7d' },
+    // JWT secret diambil dari .env via ConfigService
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET', 'dinasacademy_secret'),
+        signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') as any },
+      }),
     }),
   ],
   providers: [AuthService, JwtStrategy],

@@ -27,7 +27,11 @@ export class OrdersService {
   }
 
   async getUserOrders(userId: number) {
-    return this.orderRepo.find({ where: { userId } });
+    return this.orderRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  }
+
+  async findAll() {
+    return this.orderRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
   }
 
   async handlePaymentWebhook(body: any) {
