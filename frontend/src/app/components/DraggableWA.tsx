@@ -65,7 +65,7 @@ export default function DraggableWA() {
   const handleClick = () => {
     if (hasDragged) return;
     window.open(
-      'https://wa.me/6281234567890?text=Halo%20DINAS%20ACADEMY,%20saya%20ingin%20bertanya%20tentang%20program%20belajar',
+      'https://wa.me/6289520074667?text=Halo%20DINAS%20ACADEMY,%20saya%20ingin%20bertanya%20tentang%20program%20belajar',
       '_blank'
     );
   };

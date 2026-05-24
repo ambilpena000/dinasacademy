@@ -40,7 +40,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   purchasePackage: (packageType: 'PTN Premium' | 'SKD' | 'STIS') => void;
   updateProfile: (data: Partial<User>) => void;
-  changePassword: (oldPassword: string, newPassword: string) => boolean;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   orders: Order[];
   activatePackage: (orderId: string) => void;
   rejectOrder: (orderId: string) => void;
@@ -91,17 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.getAllOrders()
       .then((data: any[]) => {
         if (data && data.length > 0) {
-          // Map format backend ke format frontend
           const mapped: Order[] = data.map((o: any) => ({
-            id: o.id,
-            userId: o.userId,
+            id: String(o.id),
+            userId: String(o.userId),
             userName: o.user?.name || o.userName || '',
             userEmail: o.user?.email || o.userEmail || '',
             packageType: o.packageType,
             packageName: o.packageName,
-            amount: o.amount,
-            uniqueCode: o.uniqueCode,
-            totalAmount: o.totalAmount,
+            amount: Number(o.amount),
+            uniqueCode: Number(o.uniqueCode),
+            totalAmount: Number(o.totalAmount),
             paymentMethod: o.paymentMethod,
             status: o.status,
             createdAt: o.createdAt,
@@ -113,13 +112,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => {}); // fallback ke localStorage jika backend belum siap
   }, [user]);
 
-  // ── LOGIN: pakai backend API ──────────────────────────────────
+  // ── LOGIN ─────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
     try {
       const data = await api.login(email, password);
-      // Simpan token JWT
       localStorage.setItem('access_token', data.access_token);
-      // Simpan data user
       setUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
     } catch (error: any) {
@@ -137,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── REGISTER: pakai backend API ───────────────────────────────
+  // ── REGISTER ──────────────────────────────────────────────────
   const register = async (name: string, email: string, password: string) => {
     try {
       const data = await api.register(name, email, password);
@@ -154,7 +151,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('access_token');
-    localStorage.removeItem('password');
   };
 
   // ── UPDATE PROFILE ────────────────────────────────────────────
@@ -162,6 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const updatedUser = { ...user, ...data };
       const isCompleted = !!(
+        updatedUser.phone &&
+        updatedUser.school &&
         updatedUser.targetUniversity &&
         updatedUser.targetType &&
         updatedUser.goals
@@ -170,8 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
 
-      // Sinkron ke backend juga
-      api.updateProfile(data).catch(() => {});
+      // FIX: kirim profileCompleted ke backend agar tersimpan di DB
+      api.updateProfile({ ...data, profileCompleted: isCompleted }).catch(() => {});
     }
   };
 
@@ -184,15 +182,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── CHANGE PASSWORD ───────────────────────────────────────────
-  const changePassword = (oldPassword: string, newPassword: string): boolean => {
-    // Tetap pakai localStorage untuk sementara
-    const storedPassword = localStorage.getItem('password');
-    if (storedPassword === oldPassword) {
-      localStorage.setItem('password', newPassword);
+  // ── CHANGE PASSWORD — memanggil backend API ───────────────────
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<boolean> => {
+    try {
+      await api.changePassword(oldPassword, newPassword);
       return true;
+    } catch (error: any) {
+      throw new Error(error.message || 'Gagal mengubah password');
     }
-    return false;
   };
 
   // ── ADMIN: Aktivasi pesanan ───────────────────────────────────
@@ -204,22 +201,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       o.id === orderId ? { ...o, status: 'active' as const } : o
     );
     saveOrders(newOrders);
-
-    // Update all_users registry (localStorage)
-    const allUsersRaw = localStorage.getItem('all_users');
-    const allUsers: User[] = allUsersRaw ? JSON.parse(allUsersRaw) : [];
-    const updatedAllUsers = allUsers.map(u =>
-      u.email === order.userEmail
-        ? { ...u, hasPurchasedPackage: true, packageType: order.packageType }
-        : u
-    );
-    if (!updatedAllUsers.find(u => u.email === order.userEmail)) {
-      updatedAllUsers.push({
-        id: order.userId, name: order.userName, email: order.userEmail,
-        hasPurchasedPackage: true, packageType: order.packageType, role: 'user',
-      });
-    }
-    localStorage.setItem('all_users', JSON.stringify(updatedAllUsers));
 
     // Simpan ke backend PostgreSQL
     api.activateOrder(orderId).catch(() => {});
@@ -257,10 +238,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       amount: order.amount,
       paymentMethod: order.paymentMethod,
     }).then((saved: any) => {
-      // Update ID lokal dengan ID dari backend
       if (saved?.id) {
         setOrders(prev => prev.map(o =>
-          o.id === newOrder.id ? { ...o, id: saved.id } : o
+          o.id === newOrder.id ? { ...o, id: String(saved.id) } : o
         ));
       }
     }).catch(() => {});

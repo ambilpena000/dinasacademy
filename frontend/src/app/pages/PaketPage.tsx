@@ -14,7 +14,6 @@ import { Badge } from '../components/Badge';
 import { Input } from '../components/Input';
 import { mockPackages } from '../data/mockData';
 import { Footer } from '../components/Footer';
-import Slider from 'react-slick';
 
 export default function PaketPage() {
   const { user, purchasePackage, addOrder } = useAuth();
@@ -90,12 +89,20 @@ export default function PaketPage() {
   const subtotal = selectedPackage.price;
   // Kode unik 3 digit dari user ID — untuk verifikasi transfer tanpa cek manual
   const uniqueCode = React.useMemo(() => {
-    const uid = user?.id || '';
-    const digits = uid.replace(/[^0-9]/g, '');
-    return digits.length >= 3
-      ? parseInt(digits.slice(-3))
-      : Math.floor(Math.random() * 900) + 100;
-  }, [user?.id]);
+  const raw = String(user?.id ?? user?.email ?? '');
+  const digits = raw.replace(/[^0-9]/g, '');
+
+  if (digits.length >= 3) {
+    return parseInt(digits.slice(-3), 10);
+  }
+
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = raw.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return Math.abs(hash % 900) + 100;
+}, [user?.id, user?.email]);
   const total = subtotal; // harga paket
   const totalTransfer = subtotal + uniqueCode; // nominal transfer sebenarnya
 
@@ -251,7 +258,7 @@ export default function PaketPage() {
                       {/* Kode Unik - bagian terpenting */}
                       <div className="border-t border-gray-100 pt-3 bg-yellow-50 rounded-xl p-3 -mx-1">
                         <div className="flex justify-between items-center mb-1">
-                          <p className="text-sm font-bold text-gray-800">⚡ Nominal Transfer (unik)</p>
+                          <p className="text-sm font-bold text-gray-800"> Nominal Transfer (unik)</p>
                           <button
                             onClick={() => navigator.clipboard.writeText(totalTransfer.toString())}
                             className="flex items-center gap-1 text-xs text-[#2563EB] hover:underline"
@@ -263,7 +270,7 @@ export default function PaketPage() {
                           Rp {totalTransfer.toLocaleString('id-ID')}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Harga paket <span className="font-medium">Rp {subtotal.toLocaleString('id-ID')}</span> + kode unik <span className="font-bold text-yellow-700">+{uniqueCode}</span>
+                          Harga paket <span className="font-medium">Rp {subtotal.toLocaleString('id-ID')}</span> + kode unik <span className="font-bold text-yellow-700">{uniqueCode}</span>
                         </p>
 
                       </div>
@@ -294,10 +301,10 @@ export default function PaketPage() {
                         <p className="font-semibold text-gray-900">PT Dinas Academy</p>
                       </div>
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-1">
-                        <p className="text-sm font-bold text-gray-800">⚡ Nominal Transfer (unik)</p>
+                        <p className="text-sm font-bold text-gray-800"> Nominal Transfer (unik)</p>
                         <p className="text-xl font-black text-[#2563EB]">Rp {totalTransfer.toLocaleString('id-ID')}</p>
                         <p className="text-xs text-gray-500">
-                          Harga paket Rp {subtotal.toLocaleString('id-ID')} + kode unik <span className="font-bold text-yellow-700">+{uniqueCode}</span>
+                          Harga paket Rp {subtotal.toLocaleString('id-ID')} + kode unik <span className="font-bold text-yellow-700">{uniqueCode}</span>
                         </p>
 
                       </div>
@@ -342,7 +349,7 @@ export default function PaketPage() {
                 </div>
 
                 <a
-                  href={`https://wa.me/6281234567890?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konfirmasi%20pembayaran%20%F0%9F%8E%AF%0A%0APaket%3A%20*${encodeURIComponent(selectedPackage?.name || '')}*%0AMetode%3A%20${paymentMethod === 'transfer' ? 'Transfer%20Bank%20BCA' : 'E-Wallet'}%0ANominal%3A%20*Rp%20${totalTransfer.toLocaleString('id-ID')}*%0AKode%20Unik%3A%20*${uniqueCode}*%0A%0ANama%3A%20${encodeURIComponent(user?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
+                  href={`https://wa.me/6289520074667?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konfirmasi%20pembayaran%20%F0%9F%8E%AF%0A%0APaket%3A%20*${encodeURIComponent(selectedPackage?.name || '')}*%0AMetode%3A%20${paymentMethod === 'transfer' ? 'Transfer%20Bank%20BCA' : 'E-Wallet'}%0ANominal%3A%20*Rp%20${totalTransfer.toLocaleString('id-ID')}*%0AKode%20Unik%3A%20*${uniqueCode}*%0A%0ANama%3A%20${encodeURIComponent(user?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => {
@@ -751,7 +758,7 @@ export default function PaketPage() {
               </p>
               <div className="flex items-center justify-center">
                 <a
-                  href="https://wa.me/6281234567890?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konsultasi%20pilihan%20paket"
+                  href="https://wa.me/6289520074667?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konsultasi%20pilihan%20paket"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

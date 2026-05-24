@@ -14,8 +14,6 @@ export class User {
   @Column({ unique: true })
   email!: string;
 
-  // Password TIDAK boleh dikembalikan ke response.
-  // Gunakan { select: false } agar TypeORM tidak otomatis load.
   @Column({ select: false })
   password!: string;
 
@@ -24,6 +22,13 @@ export class User {
 
   @Column({ nullable: true })
   photoUrl?: string;
+
+  // FIX: tambah phone dan school yang sebelumnya tidak ada
+  @Column({ nullable: true })
+  phone?: string;
+
+  @Column({ nullable: true })
+  school?: string;
 
   @Column({ nullable: true })
   targetType?: string;

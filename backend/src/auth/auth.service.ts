@@ -21,13 +21,13 @@ export class AuthService {
       name,
       email,
       password: hashedPassword,
-      role: 'student', // Konsisten dengan default di User entity
+      role: 'student',
     });
     return this.generateToken(user);
   }
 
   async login(email: string, password: string) {
-    // Admin hardcode (optional, untuk development)
+    // Admin hardcode
     if (email === 'admin@dinasacademy.id' && password === 'Admin123!') {
       return {
         access_token: this.jwtService.sign({ sub: 'admin', email, role: 'admin' }),
@@ -49,21 +49,18 @@ export class AuthService {
     if (!isMatch) {
       throw new UnauthorizedException('Email atau password salah');
     }
-    return this.generateToken(user);
+
+    // FIX: Ambil data user lengkap dari DB setelah login
+    // agar phone, school, goals, dll ikut terbawa
+    const fullUser = await this.usersService.findOne(user.id);
+    return this.generateToken(fullUser);
   }
 
-  // Endpoint /auth/me — mengembalikan data user lengkap
   async getFullUser(userId: number | string) {
     if (userId === 'admin') {
       return { id: 'admin', name: 'Admin Dinas Academy', email: 'admin@dinasacademy.id', role: 'admin', hasPurchasedPackage: true };
     }
-    const user = await this.usersService.findOne(Number(userId));
-    return {
-      id: user.id, name: user.name, email: user.email, role: user.role,
-      hasPurchasedPackage: user.hasPurchasedPackage, packageType: user.packageType,
-      targetType: user.targetType, targetUniversity: user.targetUniversity,
-      targetMajor: user.targetMajor, profileCompleted: user.profileCompleted,
-    };
+    return this.usersService.findOne(Number(userId));
   }
 
   async changePassword(userId: number, oldPassword: string, newPassword: string) {
@@ -82,17 +79,22 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
+      // FIX: kembalikan SEMUA field profil agar tidak hilang saat login
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        phone: user.phone,
+        school: user.school,
         hasPurchasedPackage: user.hasPurchasedPackage,
         packageType: user.packageType,
         targetType: user.targetType,
         targetUniversity: user.targetUniversity,
         targetMajor: user.targetMajor,
+        goals: user.goals,
         profileCompleted: user.profileCompleted,
+        joinDate: user.joinDate,
       },
     };
   }

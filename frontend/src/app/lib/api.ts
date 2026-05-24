@@ -1,5 +1,7 @@
-// Ambil URL backend dari environment variable, fallback ke localhost
-const BASE_URL = 'http://localhost:3000/api';
+// Ambil URL backend dari environment variable Vite
+// Di development: set VITE_API_URL=http://localhost:3000/api di frontend/.env
+// Di production : set VITE_API_URL=https://api.yourdomain.com/api
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
 async function request(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('access_token');

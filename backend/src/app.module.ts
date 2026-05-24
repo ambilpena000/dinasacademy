@@ -12,28 +12,30 @@ import { PackagesModule } from './packages/packages.module';
 
 @Module({
   imports: [
-    // Load .env dari root backend (backend/.env)
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
 
-    // TypeORM menggunakan variabel dari .env via ConfigService
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 5432),
-        username: config.get<string>('DB_USERNAME', 'postgres'),
-        password: config.get<string>('DB_PASSWORD', ''),
-        database: config.get<string>('DB_NAME', 'dinasacademy'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        // WARNING: synchronize: true hanya untuk development!
-        // Di production, gunakan migrations.
-        synchronize: true,
-      }),
+      useFactory: (config: ConfigService) => {
+        const isDev = config.get<string>('NODE_ENV', 'development') !== 'production';
+        return {
+          type: 'postgres',
+          host: config.get<string>('DB_HOST', 'localhost'),
+          port: config.get<number>('DB_PORT', 5432),
+          username: config.get<string>('DB_USERNAME', 'postgres'),
+          password: config.get<string>('DB_PASSWORD', ''),
+          database: config.get<string>('DB_NAME', 'dinasacademy'),
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          // synchronize hanya aktif di development
+          // di production gunakan: npm run migration:run
+          synchronize: isDev,
+          logging: isDev,
+        };
+      },
     }),
 
     AuthModule,
