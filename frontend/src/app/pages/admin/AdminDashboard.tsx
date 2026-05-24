@@ -32,7 +32,17 @@ function StatusBadge({ status }: { status: Order['status'] }) {
 }
 
 export default function AdminDashboard() {
-  const { orders, activatePackage, rejectOrder } = useAuth();
+  const { orders, ordersLoading, activatePackage, rejectOrder } = useAuth();
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+
+  const handleActivate = async (orderId: string) => {
+    setActionLoading(orderId + '_activate');
+    try { await activatePackage(orderId); } catch {} finally { setActionLoading(null); }
+  };
+  const handleReject = async (orderId: string) => {
+    setActionLoading(orderId + '_reject');
+    try { await rejectOrder(orderId); } catch {} finally { setActionLoading(null); }
+  };
 
   const totalOrders   = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
@@ -116,13 +126,17 @@ export default function AdminDashboard() {
                       <p className="text-sm font-bold text-gray-900">{formatRupiah(order.totalAmount || order.amount)}</p>
                       <p className="text-xs text-yellow-600 font-bold">kode: +{order.uniqueCode || '-'}</p>
                     </div>
-                    <button onClick={() => rejectOrder(order.id)}
-                      className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="Tolak">
+                    <button onClick={() => handleReject(order.id)}
+                      disabled={!!actionLoading}
+                      className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50" title="Tolak">
                       <Ban className="w-4 h-4" />
                     </button>
-                    <button onClick={() => activatePackage(order.id)}
-                      className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-all flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Aktifkan
+                    <button onClick={() => handleActivate(order.id)}
+                      disabled={!!actionLoading}
+                      className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-all flex items-center gap-1 disabled:opacity-50">
+                      {actionLoading === order.id + '_activate' ? (
+                        <svg className="animate-spin w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      ) : <Check className="w-3 h-3" />} Aktifkan
                     </button>
                   </div>
                 </div>

@@ -11,7 +11,7 @@ export class OrdersService {
   ) {}
 
   async createOrder(userId: number, data: { packageName: string; packageType: string; amount: number; paymentMethod: string }) {
-    const uniqueCode = Math.floor(Math.random() * 100);
+    const uniqueCode = Math.floor(Math.random() * 900) + 100; // 100–999
     const totalAmount = data.amount + uniqueCode;
     const order = this.orderRepo.create({
       userId,
@@ -43,6 +43,21 @@ export class OrdersService {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  async activateOrder(id: number) {
+    await this.findOne(id); // validate exists
+    await this.orderRepo.update(id, {
+      status: 'active',
+      activatedAt: new Date(),
+    });
+    return this.findOne(id);
+  }
+
+  async rejectOrder(id: number) {
+    await this.findOne(id);
+    await this.orderRepo.update(id, { status: 'rejected' });
+    return this.findOne(id);
   }
 
   async updateStatus(id: number, status: string) {

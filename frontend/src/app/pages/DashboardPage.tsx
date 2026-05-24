@@ -20,7 +20,12 @@ const useLocalResults = () => {
 };
 
 export default function DashboardPage() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
+
+  // Refresh data user saat dashboard dibuka agar status paket terbaru
+  React.useEffect(() => {
+    refreshUser();
+  }, []);
   const backendResults = useLocalResults(); // ✅ perbaikan: state lokal
 
   const examResults = React.useMemo(() => {

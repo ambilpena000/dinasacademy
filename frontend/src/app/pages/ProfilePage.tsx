@@ -15,7 +15,13 @@ import { useAuth } from '../context/AuthContext';
 import { universities, getPrograms, searchUniversities } from '../data/universities';
 
 export default function ProfilePage() {
-  const { user, updateProfile, changePassword } = useAuth();
+  const { user, updateProfile, changePassword, refreshUser } = useAuth();
+
+  // Auto-refresh user dari backend saat ProfilePage dibuka
+  // agar status paket langsung terupdate setelah admin aktifkan
+  React.useEffect(() => {
+    refreshUser();
+  }, []);
   const [isEditing, setIsEditing] = useState(false);
   const [univSearch, setUnivSearch] = useState('');
   const [showUnivDropdown, setShowUnivDropdown] = useState(false);

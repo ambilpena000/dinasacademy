@@ -44,7 +44,7 @@ export class OrdersController {
     if (req.user.role !== 'admin') {
       throw new ForbiddenException('Admin only');
     }
-    const order = await this.ordersService.updateStatus(parseInt(id), 'active');
+    const order = await this.ordersService.activateOrder(parseInt(id));
     // Update user: hasPurchasedPackage = true, packageType = order.packageType
     try {
       await this.usersService.update(order.userId, {
@@ -61,6 +61,6 @@ export class OrdersController {
     if (req.user.role !== 'admin') {
       throw new ForbiddenException('Admin only');
     }
-    return this.ordersService.updateStatus(parseInt(id), 'rejected');
+    return this.ordersService.rejectOrder(parseInt(id));
   }
 }

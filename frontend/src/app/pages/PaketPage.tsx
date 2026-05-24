@@ -16,7 +16,7 @@ import { mockPackages } from '../data/mockData';
 import { Footer } from '../components/Footer';
 
 export default function PaketPage() {
-  const { user, purchasePackage, addOrder } = useAuth();
+  const { user, purchasePackage, addOrder, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packageIdFromUrl = searchParams.get('package');
@@ -121,21 +121,58 @@ export default function PaketPage() {
     }
   ];
 
-  const handlePayment = () => {
-    let packageType: 'PTN Premium' | 'SKD' | 'STIS' = 'PTN Premium';
-    if (selectedPackage.name.includes('SKD')) {
-      packageType = 'SKD';
-    } else if (selectedPackage.name.includes('STIS')) {
-      packageType = 'STIS';
-    } else {
-      packageType = 'PTN Premium';
-    }
-    
-    purchasePackage(packageType);
-    alert('Pembayaran berhasil! Akses paket sudah aktif.');
-    setCheckoutMode(false);
-    navigate('/dashboard');
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  // Flag: apakah user sudah klik tombol WA dan sedang di luar tab
+  const waOpenedRef = React.useRef(false);
+
+  const getPackageType = (): 'PTN Premium' | 'SKD' | 'STIS' => {
+    const n = selectedPackage.name.toLowerCase();
+    if (n.includes('stis')) return 'STIS';
+    if (n.includes('skd') || n.includes('sekdin') || selectedPackage.track === 'Sekdin') return 'SKD';
+    return 'PTN Premium';
   };
+
+  // Simpan order ke DB — dipanggil saat user kembali ke tab setelah chat WA
+  const saveOrderToBackend = React.useCallback(async () => {
+    if (orderSubmitted) return;
+    setIsSubmittingOrder(true);
+    try {
+      await addOrder({
+        userId: String(user?.id || ''),
+        userName: user?.name || '',
+        userEmail: user?.email || '',
+        packageType: getPackageType(),
+        packageName: selectedPackage.name,
+        amount: total,
+        paymentMethod,
+      });
+    } catch {
+      // Tetap tampilkan card konfirmasi meski backend gagal
+    } finally {
+      setOrderSubmitted(true);
+      setIsSubmittingOrder(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderSubmitted, selectedPackage, total, paymentMethod, user]);
+
+  // Saat user kembali ke tab setelah buka WA -> simpan order & tampilkan card
+  React.useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && waOpenedRef.current) {
+        waOpenedRef.current = false;
+        saveOrderToBackend();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [saveOrderToBackend]);
+
+  // Klik tombol: langsung buka WA, flag dinyalakan
+  const handleConfirmViaWA = () => {
+    if (orderSubmitted) return;
+    waOpenedRef.current = true;
+  };
+
 
   // If in checkout mode, show checkout view
   if (checkoutMode) {
@@ -348,34 +385,32 @@ export default function PaketPage() {
                   </div>
                 </div>
 
+                {/* Selalu tampilkan tombol WA — klik buka WA, saat kembali card konfirmasi muncul */}
                 <a
                   href={`https://wa.me/6289520074667?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konfirmasi%20pembayaran%20%F0%9F%8E%AF%0A%0APaket%3A%20*${encodeURIComponent(selectedPackage?.name || '')}*%0AMetode%3A%20${paymentMethod === 'transfer' ? 'Transfer%20Bank%20BCA' : 'E-Wallet'}%0ANominal%3A%20*Rp%20${totalTransfer.toLocaleString('id-ID')}*%0AKode%20Unik%3A%20*${uniqueCode}*%0A%0ANama%3A%20${encodeURIComponent(user?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => {
-                    // Save order to admin panel
-                    addOrder({
-                      userId: user?.id || '',
-                      userName: user?.name || '',
-                      userEmail: user?.email || '',
-                      packageType: (() => {
-                        const n = selectedPackage.name.toLowerCase();
-                        if (n.includes('stis')) return 'STIS';
-                        if (n.includes('skd') || n.includes('sekdin') || selectedPackage.track === 'Sekdin') return 'SKD';
-                        return 'PTN Premium';
-                      })() as 'PTN Premium' | 'SKD' | 'STIS',
-                      packageName: selectedPackage.name,
-                      amount: total,
-                      paymentMethod,
-                    });
-                    // uniqueCode dan totalAmount dihitung otomatis di addOrder
-                    setOrderSubmitted(true);
-                  }}
+                  onClick={handleConfirmViaWA}
+                  className={`w-full py-3 px-6 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all ${
+                    orderSubmitted
+                      ? 'bg-gradient-to-r from-[#128C7E] to-[#075E54]'
+                      : 'bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#128C7E] hover:to-[#075E54]'
+                  }`}
                 >
-                  <Button variant="primary" size="lg" className="w-full bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#128C7E] hover:to-[#075E54]">
-                    <MessageCircle className="w-5 h-5 mr-2" />
-                    Bayar & Konfirmasi via WA
-                  </Button>
+                  {isSubmittingOrder ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                      </svg>
+                      Menyimpan Pesanan...
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle className="w-5 h-5" />
+                      {orderSubmitted ? 'Buka WhatsApp Lagi' : 'Bayar & Konfirmasi via WA'}
+                    </>
+                  )}
                 </a>
                 {orderSubmitted && (
                   <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">

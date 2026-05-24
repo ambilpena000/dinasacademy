@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from '../lib/api';
 
 export interface Order {
@@ -42,29 +42,33 @@ interface AuthContextType {
   updateProfile: (data: Partial<User>) => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   orders: Order[];
-  activatePackage: (orderId: string) => void;
-  rejectOrder: (orderId: string) => void;
-  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'status' | 'uniqueCode' | 'totalAmount'>) => void;
+  ordersLoading: boolean;
+  activatePackage: (orderId: string) => Promise<void>;
+  rejectOrder: (orderId: string) => Promise<void>;
+  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'status' | 'uniqueCode' | 'totalAmount'>) => Promise<Order>;
+  refreshOrders: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEMO_ORDERS: Order[] = [
-  {
-    id: 'ORD-001', userId: 'u1', userName: 'Andi Setiawan',
-    userEmail: 'andi@gmail.com', packageType: 'PTN Premium',
-    packageName: 'Paket PTN SNBT', amount: 1999000, uniqueCode: 847,
-    totalAmount: 1999847, paymentMethod: 'transfer', status: 'pending',
-    createdAt: '2026-03-09T08:30:00',
-  },
-  {
-    id: 'ORD-002', userId: 'u2', userName: 'Siti Rahma',
-    userEmail: 'siti@gmail.com', packageType: 'SKD',
-    packageName: 'Paket SKD Sekdin', amount: 1499000, uniqueCode: 312,
-    totalAmount: 1499312, paymentMethod: 'ewallet', status: 'pending',
-    createdAt: '2026-03-09T09:15:00',
-  },
-];
+// ── Helper: Map raw backend order ke Order interface ──────────────
+function mapOrder(o: any): Order {
+  return {
+    id: String(o.id),
+    userId: String(o.userId),
+    userName: o.user?.name || o.userName || '',
+    userEmail: o.user?.email || o.userEmail || '',
+    packageType: o.packageType,
+    packageName: o.packageName,
+    amount: Number(o.amount),
+    uniqueCode: Number(o.uniqueCode),
+    totalAmount: Number(o.totalAmount),
+    paymentMethod: o.paymentMethod,
+    status: o.status,
+    createdAt: o.createdAt,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -73,87 +77,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const stored = localStorage.getItem('orders');
-    if (stored) { try { return JSON.parse(stored); } catch { return DEMO_ORDERS; } }
-    return DEMO_ORDERS;
-  });
+  // Orders: mulai dari array kosong — TIDAK ada dummy data
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
-  const saveOrders = (newOrders: Order[]) => {
-    setOrders(newOrders);
-    localStorage.setItem('orders', JSON.stringify(newOrders));
-  };
-
-  // Fetch orders dari backend saat pertama load (jika sudah login)
-  React.useEffect(() => {
+  // ── Fetch orders dari backend ────────────────────────────────────
+  const refreshOrders = useCallback(async () => {
     const token = localStorage.getItem('access_token');
     if (!token) return;
-    api.getAllOrders()
-      .then((data: any[]) => {
-        if (data && data.length > 0) {
-          const mapped: Order[] = data.map((o: any) => ({
-            id: String(o.id),
-            userId: String(o.userId),
-            userName: o.user?.name || o.userName || '',
-            userEmail: o.user?.email || o.userEmail || '',
-            packageType: o.packageType,
-            packageName: o.packageName,
-            amount: Number(o.amount),
-            uniqueCode: Number(o.uniqueCode),
-            totalAmount: Number(o.totalAmount),
-            paymentMethod: o.paymentMethod,
-            status: o.status,
-            createdAt: o.createdAt,
-          }));
-          setOrders(mapped);
-          localStorage.setItem('orders', JSON.stringify(mapped));
-        }
-      })
-      .catch(() => {}); // fallback ke localStorage jika backend belum siap
-  }, [user]);
+    setOrdersLoading(true);
+    try {
+      const data: any[] = await api.getAllOrders();
+      if (Array.isArray(data)) {
+        setOrders(data.map(mapOrder));
+      }
+    } catch {
+      // jika backend belum siap, biarkan orders kosong
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, []);
 
-  // ── LOGIN ─────────────────────────────────────────────────────
+  // ── Fetch data user terbaru dari backend ─────────────────────────
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const fresh = await api.getMe();
+      if (fresh) {
+        const updated = {
+          ...fresh,
+          id: String(fresh.id),
+          role: fresh.role === 'admin' ? 'admin' : 'user',
+        };
+        setUser(updated);
+        localStorage.setItem('user', JSON.stringify(updated));
+      }
+    } catch { /* gagal refresh — biarkan data lama */ }
+  }, []);
+
+  // Fetch orders dan user saat login (user berubah)
+  React.useEffect(() => {
+    if (user) {
+      refreshOrders();
+    } else {
+      setOrders([]);
+    }
+  }, [user?.id]); // hanya saat id user berubah (login/logout)
+
+  // ── LOGIN ─────────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
     try {
       const data = await api.login(email, password);
       localStorage.setItem('access_token', data.access_token);
-      setUser(data.user);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Bersihkan data lama agar tidak ada dummy orders tersisa
+      localStorage.removeItem('orders');
+      const u = { ...data.user, id: String(data.user.id) };
+      setUser(u);
+      localStorage.setItem('user', JSON.stringify(u));
     } catch (error: any) {
-      // Fallback ke admin hardcode jika backend belum ada user admin
-      if (email === 'admin@dinasacademy.id' && password === 'Admin123!') {
-        const adminUser: User = {
-          id: 'admin', name: 'Admin Dinas Academy',
-          email, hasPurchasedPackage: true, role: 'admin',
-        };
-        setUser(adminUser);
-        localStorage.setItem('user', JSON.stringify(adminUser));
-        return;
-      }
       throw new Error(error.message || 'Email atau password salah');
     }
   };
 
-  // ── REGISTER ──────────────────────────────────────────────────
+  // ── REGISTER ──────────────────────────────────────────────────────
   const register = async (name: string, email: string, password: string) => {
     try {
       const data = await api.register(name, email, password);
       localStorage.setItem('access_token', data.access_token);
-      setUser(data.user);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const u = { ...data.user, id: String(data.user.id) };
+      setUser(u);
+      localStorage.setItem('user', JSON.stringify(u));
     } catch (error: any) {
       throw new Error(error.message || 'Gagal mendaftar, coba lagi');
     }
   };
 
-  // ── LOGOUT ────────────────────────────────────────────────────
+  // ── LOGOUT ────────────────────────────────────────────────────────
   const logout = () => {
     setUser(null);
+    setOrders([]);
     localStorage.removeItem('user');
     localStorage.removeItem('access_token');
   };
 
-  // ── UPDATE PROFILE ────────────────────────────────────────────
+  // ── UPDATE PROFILE ────────────────────────────────────────────────
   const updateProfile = (data: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...data };
@@ -167,13 +175,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatedUser.profileCompleted = isCompleted;
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-
-      // FIX: kirim profileCompleted ke backend agar tersimpan di DB
       api.updateProfile({ ...data, profileCompleted: isCompleted }).catch(() => {});
     }
   };
 
-  // ── PURCHASE PACKAGE ──────────────────────────────────────────
+  // ── PURCHASE PACKAGE (local update sementara) ─────────────────────
   const purchasePackage = (packageType: 'PTN Premium' | 'SKD' | 'STIS') => {
     if (user) {
       const updatedUser = { ...user, hasPurchasedPackage: true, packageType };
@@ -182,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── CHANGE PASSWORD — memanggil backend API ───────────────────
+  // ── CHANGE PASSWORD ───────────────────────────────────────────────
   const changePassword = async (oldPassword: string, newPassword: string): Promise<boolean> => {
     try {
       await api.changePassword(oldPassword, newPassword);
@@ -192,65 +198,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── ADMIN: Aktivasi pesanan ───────────────────────────────────
-  const activatePackage = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const newOrders = orders.map(o =>
-      o.id === orderId ? { ...o, status: 'active' as const } : o
-    );
-    saveOrders(newOrders);
-
+  // ── ADD ORDER — simpan ke backend, tambahkan ke state ─────────────
+  const addOrder = async (
+    order: Omit<Order, 'id' | 'createdAt' | 'status' | 'uniqueCode' | 'totalAmount'>
+  ): Promise<Order> => {
     // Simpan ke backend PostgreSQL
-    api.activateOrder(orderId).catch(() => {});
-  };
-
-  const rejectOrder = (orderId: string) => {
-    const newOrders = orders.map(o =>
-      o.id === orderId ? { ...o, status: 'rejected' as const } : o
-    );
-    saveOrders(newOrders);
-    api.rejectOrder(orderId).catch(() => {});
-  };
-
-  const addOrder = (order: Omit<Order, 'id' | 'createdAt' | 'status' | 'uniqueCode' | 'totalAmount'>) => {
-    const userId = order.userId || '';
-    const digits = userId.replace(/\D/g, '');
-    const uniqueCode = digits.length >= 3
-      ? parseInt(digits.slice(-3))
-      : Math.floor(Math.random() * 900) + 100;
-
-    const newOrder: Order = {
-      ...order,
-      id: `ORD-${Date.now()}`,
-      uniqueCode,
-      totalAmount: order.amount + uniqueCode,
-      createdAt: new Date().toISOString(),
-      status: 'pending',
-    };
-    saveOrders([newOrder, ...orders]);
-
-    // Simpan ke backend PostgreSQL
-    api.createOrder({
+    const saved = await api.createOrder({
       packageName: order.packageName,
       packageType: order.packageType,
       amount: order.amount,
       paymentMethod: order.paymentMethod,
-    }).then((saved: any) => {
-      if (saved?.id) {
-        setOrders(prev => prev.map(o =>
-          o.id === newOrder.id ? { ...o, id: String(saved.id) } : o
-        ));
-      }
-    }).catch(() => {});
+    });
+
+    const newOrder = mapOrder({
+      ...saved,
+      userName: user?.name || '',
+      userEmail: user?.email || '',
+    });
+
+    // Tambahkan ke state orders (di bagian depan)
+    setOrders(prev => [newOrder, ...prev]);
+    return newOrder;
+  };
+
+  // ── ADMIN: Aktivasi pesanan ───────────────────────────────────────
+  const activatePackage = async (orderId: string) => {
+    // Optimistic update UI
+    setOrders(prev =>
+      prev.map(o => o.id === orderId ? { ...o, status: 'active' as const } : o)
+    );
+    try {
+      await api.activateOrder(orderId);
+      // Refresh semua orders dari backend untuk data terbaru
+      await refreshOrders();
+    } catch (e) {
+      // Rollback jika gagal
+      setOrders(prev =>
+        prev.map(o => o.id === orderId ? { ...o, status: 'pending' as const } : o)
+      );
+      throw e;
+    }
+  };
+
+  // ── ADMIN: Tolak pesanan ──────────────────────────────────────────
+  const rejectOrder = async (orderId: string) => {
+    setOrders(prev =>
+      prev.map(o => o.id === orderId ? { ...o, status: 'rejected' as const } : o)
+    );
+    try {
+      await api.rejectOrder(orderId);
+      await refreshOrders();
+    } catch (e) {
+      setOrders(prev =>
+        prev.map(o => o.id === orderId ? { ...o, status: 'pending' as const } : o)
+      );
+      throw e;
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user, login, logout, register, purchasePackage,
       updateProfile, changePassword,
-      orders, activatePackage, rejectOrder, addOrder,
+      orders, ordersLoading,
+      activatePackage, rejectOrder, addOrder,
+      refreshOrders, refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

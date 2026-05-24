@@ -30,8 +30,8 @@ function StatusBadge({ status }: { status: Order['status'] }) {
 }
 
 // ── Confirm Modal ──────────────────────────────────────────────────
-function ConfirmModal({ type, order, onConfirm, onClose }: {
-  type: 'activate' | 'reject'; order: Order; onConfirm: () => void; onClose: () => void;
+function ConfirmModal({ type, order, onConfirm, onClose, loading }: {
+  type: 'activate' | 'reject'; order: Order; onConfirm: () => void; onClose: () => void; loading?: boolean;
 }) {
   const isActivate = type === 'activate';
   return (
@@ -42,7 +42,7 @@ function ConfirmModal({ type, order, onConfirm, onClose }: {
         exit={{ scale: 0.9, y: 20, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        <button onClick={onClose} disabled={loading} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 disabled:opacity-50"><X className="w-4 h-4" /></button>
         <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${isActivate ? 'bg-green-100' : 'bg-red-100'}`}>
           {isActivate ? <CheckCircle className="w-6 h-6 text-green-500" /> : <Ban className="w-6 h-6 text-red-500" />}
         </div>
@@ -51,9 +51,12 @@ function ConfirmModal({ type, order, onConfirm, onClose }: {
         <p className="text-sm font-semibold text-center text-gray-800 mb-1">{order.userName}</p>
         <p className="text-xs text-center text-[#2563EB] mb-5">{order.packageName} — {formatRupiah(order.amount)}</p>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all">Batal</button>
-          <button onClick={onConfirm} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all ${isActivate ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}>
-            {isActivate ? 'Ya, Aktifkan' : 'Ya, Tolak'}
+          <button onClick={onClose} disabled={loading} className="flex-1 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-50">Batal</button>
+          <button onClick={onConfirm} disabled={loading} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-70 ${isActivate ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}>
+            {loading ? (
+              <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            ) : null}
+            {loading ? 'Memproses...' : isActivate ? 'Ya, Aktifkan' : 'Ya, Tolak'}
           </button>
         </div>
       </motion.div>
@@ -120,7 +123,7 @@ function DetailModal({ order, onClose, onActivate, onReject }: {
 type FilterStatus = 'all' | 'pending' | 'active' | 'rejected';
 
 export default function AdminOrders() {
-  const { orders, activatePackage, rejectOrder } = useAuth();
+  const { orders, ordersLoading, activatePackage, rejectOrder } = useAuth();
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -138,16 +141,25 @@ export default function AdminOrders() {
   const handleActivate = (order: Order) => { setConfirmModal({ type: 'activate', order }); setDetailOrder(null); };
   const handleReject   = (order: Order) => { setConfirmModal({ type: 'reject', order }); setDetailOrder(null); };
 
-  const handleConfirm = () => {
-    if (!confirmModal) return;
-    if (confirmModal.type === 'activate') {
-      activatePackage(confirmModal.order.id);
-      showToast(`Paket ${confirmModal.order.userName} berhasil diaktifkan!`);
-    } else {
-      rejectOrder(confirmModal.order.id);
-      showToast(`Pesanan ${confirmModal.order.userName} ditolak.`, 'error');
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!confirmModal || confirmLoading) return;
+    setConfirmLoading(true);
+    try {
+      if (confirmModal.type === 'activate') {
+        await activatePackage(confirmModal.order.id);
+        showToast(`Paket ${confirmModal.order.userName} berhasil diaktifkan!`);
+      } else {
+        await rejectOrder(confirmModal.order.id);
+        showToast(`Pesanan ${confirmModal.order.userName} ditolak.`, 'error');
+      }
+      setConfirmModal(null);
+    } catch (e: any) {
+      showToast(e.message || 'Terjadi kesalahan', 'error');
+    } finally {
+      setConfirmLoading(false);
     }
-    setConfirmModal(null);
   };
 
   const filtered = orders.filter(o => {
@@ -166,7 +178,7 @@ export default function AdminOrders() {
   return (
     <AdminLayout title="📦 Manajemen Pesanan" subtitle="Kelola dan konfirmasi aktivasi paket pengguna">
       <AnimatePresence>
-        {confirmModal && <ConfirmModal type={confirmModal.type} order={confirmModal.order} onConfirm={handleConfirm} onClose={() => setConfirmModal(null)} />}
+        {confirmModal && <ConfirmModal type={confirmModal.type} order={confirmModal.order} onConfirm={handleConfirm} onClose={() => !confirmLoading && setConfirmModal(null)} loading={confirmLoading} />}
         {detailOrder && <DetailModal order={detailOrder} onClose={() => setDetailOrder(null)} onActivate={() => handleActivate(detailOrder)} onReject={() => handleReject(detailOrder)} />}
         {toast && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -222,7 +234,12 @@ export default function AdminOrders() {
             <div className="col-span-2 text-right">Aksi</div>
           </div>
 
-          {filtered.length === 0 ? (
+          {ordersLoading ? (
+            <div className="py-16 text-center text-gray-400">
+              <svg className="animate-spin w-8 h-8 mx-auto mb-2 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <p className="text-sm">Memuat pesanan...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <p className="text-sm">Tidak ada pesanan ditemukan</p>
             </div>
@@ -282,7 +299,7 @@ export default function AdminOrders() {
             </div>
           )}
         </div>
-        <p className="text-xs text-gray-400 text-right">Menampilkan {filtered.length} dari {orders.length} pesanan</p>
+        <p className="text-xs text-gray-400 text-right">Menampilkan {filtered.length} dari {orders.length} pesanan {ordersLoading && '(memuat...)'}</p>
       </div>
     </AdminLayout>
   );
