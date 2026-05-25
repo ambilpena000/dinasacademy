@@ -49,14 +49,23 @@ export default function AdminDashboard() {
   const activeOrders  = orders.filter(o => o.status === 'active').length;
   const totalRevenue  = orders.filter(o => o.status === 'active').reduce((s, o) => s + o.amount, 0);
 
-  const totalUsers = React.useMemo(() => {
-    const raw = localStorage.getItem('all_users');
-    return raw ? JSON.parse(raw).filter((u: any) => u.role !== 'admin').length : 0;
-  }, []);
+  const [totalUsers, setTotalUsers] = React.useState<number>(0);
+  const [totalQuestions, setTotalQuestions] = React.useState<number>(0);
 
-  const totalQuestions = React.useMemo(() => {
-    const raw = localStorage.getItem('question_bank');
-    return raw ? JSON.parse(raw).length : 5;
+  React.useEffect(() => {
+    // Fetch users dari backend
+    import('../../lib/api').then(({ api }) => {
+      api.getAllUsers()
+        .then((users: any[]) => {
+          setTotalUsers(users.filter((u: any) => u.role !== 'admin').length);
+        })
+        .catch(() => {});
+
+      // Fetch questions count
+      api.getAllQuestions()
+        .then((qs: any[]) => setTotalQuestions(qs.length))
+        .catch(() => {});
+    });
   }, []);
 
   const stats = [

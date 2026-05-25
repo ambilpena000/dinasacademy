@@ -5,6 +5,7 @@ import {
   Save, ChevronDown, CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import { api } from '../../lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Question {
@@ -80,10 +81,40 @@ function DeleteModal({ question, onConfirm, onClose }: { question: Question; onC
 }
 
 export default function AdminQuestions() {
-  const [questions, setQuestions] = useState<Question[]>(() => {
-    const raw = localStorage.getItem('question_bank');
-    return raw ? JSON.parse(raw) : DEMO_QUESTIONS;
-  });
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [qLoading, setQLoading] = useState(true);
+  const [backendTryouts, setBackendTryouts] = useState<any[]>([]);
+
+  // Fetch questions & tryouts dari backend
+  React.useEffect(() => {
+    setQLoading(true);
+    api.getAllQuestions()
+      .then((data: any[]) => {
+        const mapped: Question[] = data.map((q: any) => ({
+          id: String(q.id),
+          subject: q.subtestName || q.subtestCode || '',
+          tryOutId: q.tryoutId ? String(q.tryoutId) : '',
+          questionText: q.questionText,
+          options: [
+            { id: 'a', text: q.optionA || '' },
+            { id: 'b', text: q.optionB || '' },
+            { id: 'c', text: q.optionC || '' },
+            { id: 'd', text: q.optionD || '' },
+            ...(q.optionE ? [{ id: 'e', text: q.optionE }] : []),
+          ],
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation || '',
+          tips: q.tips || '',
+        }));
+        setQuestions(mapped);
+      })
+      .catch(() => setQuestions([]))
+      .finally(() => setQLoading(false));
+
+    api.getTryouts()
+      .then((data: any[]) => setBackendTryouts(data))
+      .catch(() => {});
+  }, []);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [tryOutFilter, setTryOutFilter] = useState('all');
@@ -96,7 +127,7 @@ export default function AdminQuestions() {
 
   const saveQuestions = (qs: Question[]) => {
     setQuestions(qs);
-    localStorage.setItem('question_bank', JSON.stringify(qs));
+    // Saved to backend
   };
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {

@@ -5,29 +5,32 @@ import {
   TrendingUp, ChevronRight, Target, 
   Award, AlertCircle, GraduationCap, MapPin, Users,
   CheckCircle, Bookmark,
-  Filter, Info
+  Filter, Info, BarChart3
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { mockScores } from '../data/mockData';
+
 import { useResults } from '../hooks/useResults';
 import { universities, getPrograms, getPassingGradeStatus, PASSING_GRADE_DISCLAIMER } from '../data/universities';
 
 export default function HasilPage() {
-  const { results: backendResults } = useResults();
+  const { results: backendResults, loading: resultsLoading } = useResults();
 
 
-  // Read real exam results from localStorage, fall back to mockScores
+  // Read real exam results — NO MOCK FALLBACK
   const realResults = React.useMemo(() => {
-    const raw = backendResults.length > 0 ? JSON.stringify(backendResults) : localStorage.getItem('exam_results');
+    if (backendResults.length > 0) return backendResults;
+    const raw = localStorage.getItem('exam_results');
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.length > 0) return parsed;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
     }
-    return mockScores;
-  }, []);
+    return [];
+  }, [backendResults]);
 
   const latestResult = realResults[0];
   const avgScore = realResults.length > 0
@@ -55,7 +58,7 @@ export default function HasilPage() {
   }, [realResults]);
 
   // Subject scores for bar chart
-  const subjectData = (latestResult?.subScores || mockScores[0].subScores).map((s: any, index: number) => ({
+  const subjectData = (latestResult?.subScores || []).map((s: any, index: number) => ({
     id: `${s.code || s.subject}-${index}`,
     name: s.code || s.subject.split(' ')[0], // short code for chart
     fullName: s.subject,
@@ -65,12 +68,12 @@ export default function HasilPage() {
   }));
 
   // Weakest subjects
-  const weakestSubjects = [...(latestResult?.subScores || mockScores[0].subScores)]
+  const weakestSubjects = [...(latestResult?.subScores || [])]
     .sort((a, b) => (a.score / a.maxScore) - (b.score / b.maxScore))
     .slice(0, 2);
 
 
-  const latestScore = latestResult?.totalScore || mockScores[0].totalScore;
+  const latestScore = latestResult?.totalScore || 0;
   const highestScore = realResults.length > 0
     ? Math.max(...realResults.map((r: any) => r.totalScore || 0))
     : latestScore;
@@ -115,8 +118,28 @@ export default function HasilPage() {
         </div>
       </motion.div>
 
+      {/* Empty state — belum ada hasil */}
+      {!resultsLoading && realResults.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+              <BarChart3 className="w-8 h-8 text-[#2563EB]" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Belum Ada Hasil</h3>
+            <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+              Kerjakan try out terlebih dahulu untuk melihat analisis dan progres nilaimu di sini.
+            </p>
+            <Link to="/tryout">
+              <button className="px-6 py-3 bg-[#2563EB] text-white font-semibold rounded-xl hover:bg-[#1d4ed8] transition-all">
+                Mulai Try Out Sekarang →
+              </button>
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
       {/* Overview Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
+      {realResults.length > 0 && <div className="grid md:grid-cols-2 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -146,9 +169,9 @@ export default function HasilPage() {
             </CardContent>
           </Card>
         </motion.div>
-      </div>
+      </div>}
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      {realResults.length > 0 && <div className="grid lg:grid-cols-2 gap-6">
         {/* Progress Chart */}
         <Card>
           <CardHeader>
@@ -210,7 +233,7 @@ export default function HasilPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

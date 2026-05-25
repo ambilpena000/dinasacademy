@@ -1,21 +1,21 @@
 // frontend/src/app/hooks/useTryouts.ts
-// Hook untuk fetch try out dari backend
+// Hook untuk fetch try out dari backend — NO MOCK DATA
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { mockTryOuts } from '../data/mockData';
 
 export function useTryouts() {
-  const [tryouts, setTryouts] = useState<any[]>(mockTryOuts);
-  const [loading, setLoading] = useState(false);
+  const [tryouts, setTryouts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     api.getTryouts()
       .then((data: any[]) => {
         if (data && data.length > 0) {
-          // Format backend ke format frontend
           const mapped = data.map((t: any) => ({
-            id: t.id,
+            id: String(t.id),
             title: t.title,
             description: t.description,
             category: t.category,
@@ -24,20 +24,23 @@ export function useTryouts() {
             totalQuestions: t.totalQuestions,
             isActive: t.isActive,
             isLocked: t.isLocked || false,
-            isCompleted: false, // akan di-update dari localStorage
-            subjects: [], // akan di-isi dari questions
+            isCompleted: false,
+            subjects: Array.isArray(t.subjects) ? t.subjects : [],
           }));
           setTryouts(mapped);
+        } else {
+          setTryouts([]);
         }
-        // Jika backend kosong, tetap pakai mockData
       })
-      .catch(() => {
-        // Backend belum siap, pakai mockData
+      .catch((err) => {
+        console.error('Gagal fetch tryouts:', err);
+        setError('Gagal memuat try out');
+        setTryouts([]);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  return { tryouts, loading };
+  return { tryouts, loading, error };
 }
 
 export function useQuestions(tryoutId: string) {
@@ -50,7 +53,6 @@ export function useQuestions(tryoutId: string) {
     api.getQuestions(tryoutId)
       .then((data: any[]) => {
         if (data && data.length > 0) {
-          // Format backend ke format frontend
           const mapped = data.map((q: any, i: number) => ({
             id: q.id,
             questionNumber: i + 1,

@@ -4,54 +4,74 @@ import { motion } from 'motion/react';
 import {
   FileText, BarChart3, ArrowRight, ChevronRight,
   Target, Calendar, Clock, TrendingUp,
-  CheckCircle, Play
+  CheckCircle, Play, Loader2
 } from 'lucide-react';
-import { mockTryOuts, mockScores } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-
-// Hook sederhana untuk mengambil hasil dari localStorage (fallback)
-const useLocalResults = () => {
-  const [results, setResults] = React.useState<any[]>([]);
-  React.useEffect(() => {
-    const raw = localStorage.getItem('exam_results');
-    setResults(raw ? JSON.parse(raw) : []);
-  }, []);
-  return results;
-};
+import { useTryouts } from '../hooks/useTryouts';
+import { useResults } from '../hooks/useResults';
+import { mockPackages } from '../data/mockData';
 
 export default function DashboardPage() {
   const { user: authUser, refreshUser } = useAuth();
 
-  // Refresh data user saat dashboard dibuka agar status paket terbaru
   React.useEffect(() => {
     refreshUser();
   }, []);
-  const backendResults = useLocalResults(); // ✅ perbaikan: state lokal
 
+  // Hasil dari backend/localStorage — NO MOCK FALLBACK
+  const { results: backendResults, loading: resultsLoading } = useResults();
   const examResults = React.useMemo(() => {
-    return backendResults.length > 0 ? backendResults : mockScores;
+    return backendResults.length > 0 ? backendResults : [];
   }, [backendResults]);
+
+  // Try out dari backend — NO MOCK
+  const { tryouts: backendTryouts, loading: tryoutsLoading } = useTryouts();
 
   const completedIds: string[] = React.useMemo(() => {
     const raw = localStorage.getItem('completed_tryouts');
     return raw ? JSON.parse(raw) : [];
   }, []);
 
-  const displayName = authUser?.name || 'Siswa';
+  // Hitung max tryout sesuai paket
+  const maxTryouts = React.useMemo(() => {
+    if (!authUser?.packageType) return 0;
+    const pkg = mockPackages.find(p =>
+      p.name.toLowerCase() === (authUser.packageType || '').toLowerCase() ||
+      (authUser.packageType || '').toLowerCase().includes(p.name.toLowerCase().split(' ')[1]?.toLowerCase() || '')
+    );
+    return pkg?.includedTryOuts || 999;
+  }, [authUser]);
 
-  const mergedTryOuts = mockTryOuts.map(t => ({
-    ...t,
-    isCompleted: completedIds.includes(t.id) || t.isCompleted,
-  }));
+  // Filter tryout sesuai kategori paket
+  const allowedCategories = React.useMemo((): string[] => {
+    if (!authUser?.hasPurchasedPackage || !authUser?.packageType) return [];
+    const pkg = (authUser.packageType || '').toLowerCase();
+    if (pkg.includes('combo') || pkg.includes('lengkap')) return ['PTN', 'SKD', 'STIS'];
+    if (pkg.includes('ptn') || pkg.includes('snbt')) return ['PTN'];
+    if (pkg.includes('stis')) return ['STIS', 'SKD'];
+    if (pkg.includes('skd') || pkg.includes('sekdin')) return ['SKD'];
+    return [];
+  }, [authUser]);
+
+  const mergedTryOuts = React.useMemo(() => {
+    return backendTryouts
+      .filter(t => allowedCategories.includes(t.category))
+      .slice(0, maxTryouts)
+      .map(t => ({
+        ...t,
+        isCompleted: completedIds.includes(t.id) || t.isCompleted,
+      }));
+  }, [backendTryouts, allowedCategories, maxTryouts, completedIds]);
 
   const upcomingTryOuts = mergedTryOuts.filter(t => !t.isCompleted && !t.isLocked).slice(0, 2);
   const completedCount = mergedTryOuts.filter(t => t.isCompleted).length;
 
-  const displayResults = examResults.length > 0 ? examResults : mockScores;
-  const recentScore = displayResults[0] || null;
-  const avgScore = displayResults.length > 0
-    ? (displayResults.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / displayResults.length).toFixed(1)
+  const recentScore = examResults.length > 0 ? examResults[0] : null;
+  const avgScore = examResults.length > 0
+    ? (examResults.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / examResults.length).toFixed(1)
     : '0';
+
+  const displayName = authUser?.name || 'Siswa';
 
   const greetingTime = () => {
     const h = new Date().getHours();
@@ -72,7 +92,7 @@ export default function DashboardPage() {
         <div className="absolute right-10 bottom-0 w-32 h-32 rounded-full bg-white/5" />
         <div className="relative z-10 p-6">
           <p className="text-blue-200 text-sm mb-1">{greetingTime()},</p>
-          <h1 className="text-white text-3xl font-bold mb-4">{displayName.split(' ')[0]}</h1>
+          <h1 className="text-white text-3xl font-bold mb-4">{displayName}</h1>
           <div className="flex items-center gap-3 flex-wrap">
             {authUser?.hasPurchasedPackage ? (
               <span className="inline-flex items-center gap-2 bg-white/15 text-white text-sm font-semibold px-4 py-2 rounded-xl">
@@ -106,18 +126,18 @@ export default function DashboardPage() {
             value: completedCount,
             suffix: `/${mergedTryOuts.length}`,
             icon: <CheckCircle className="w-5 h-5 text-[#2563EB]" />,
-            progress: Math.round((completedCount / Math.max(mergedTryOuts.length, 1)) * 100),
+            progress: mergedTryOuts.length > 0 ? Math.round((completedCount / mergedTryOuts.length) * 100) : 0,
           },
           {
             label: 'Rata-rata Skor',
-            value: `${avgScore}%`,
+            value: examResults.length > 0 ? `${avgScore}%` : '—',
             suffix: null,
             icon: <TrendingUp className="w-5 h-5 text-[#2563EB]" />,
             progress: null,
           },
           {
             label: 'Try Out Tersedia',
-            value: mergedTryOuts.filter(t => !t.isLocked).length,
+            value: tryoutsLoading ? '...' : mergedTryOuts.filter(t => !t.isLocked).length,
             suffix: null,
             icon: <Play className="w-5 h-5 text-[#2563EB]" />,
             progress: null,
@@ -174,7 +194,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                <BarChart3 className="w-4.5 h-4.5 w-[18px] h-[18px] text-[#2563EB]" />
+                <BarChart3 className="w-[18px] h-[18px] text-[#2563EB]" />
               </div>
               <h2 className="text-base font-bold text-gray-900">Hasil Try Out Terakhir</h2>
             </div>
@@ -270,7 +290,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="divide-y divide-gray-50">
-            {upcomingTryOuts.length > 0 ? upcomingTryOuts.map((tryOut, i) => (
+            {tryoutsLoading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="w-6 h-6 text-[#2563EB] animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-400">Memuat try out...</p>
+              </div>
+            ) : upcomingTryOuts.length > 0 ? upcomingTryOuts.map((tryOut, i) => (
               <Link key={tryOut.id} to={`/tryout/${tryOut.id}/exam`}>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -302,7 +327,19 @@ export default function DashboardPage() {
                   </div>
                 </motion.div>
               </Link>
-            )) : (
+            )) : mergedTryOuts.length === 0 ? (
+              <div className="py-8 text-center">
+                <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Try out belum tersedia</p>
+                {!authUser?.hasPurchasedPackage && (
+                  <Link to="/paket">
+                    <button className="mt-3 px-4 py-2 text-sm font-semibold text-[#2563EB] bg-blue-50 rounded-xl hover:bg-blue-100 transition-all">
+                      Beli Paket →
+                    </button>
+                  </Link>
+                )}
+              </div>
+            ) : (
               <div className="py-10 text-center">
                 <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
                 <p className="font-semibold text-gray-600">Semua try out sudah dikerjakan!</p>
@@ -313,8 +350,8 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* Riwayat Skor */}
-      {displayResults.length > 0 && (
+      {/* Riwayat Skor — hanya tampil kalau ada hasil real */}
+      {examResults.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
@@ -327,7 +364,7 @@ export default function DashboardPage() {
               <Link to="/hasil" className="text-sm text-[#2563EB] font-semibold hover:underline">Semua</Link>
             </div>
             <div className="divide-y divide-gray-50">
-              {displayResults.slice(0, 3).map((r: any, i: number) => (
+              {examResults.slice(0, 3).map((r: any, i: number) => (
                 <div key={i} className="flex items-center justify-between px-6 py-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-800 truncate">{r.tryOutTitle}</p>

@@ -3,11 +3,11 @@ import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import {
   Search, Clock, FileText, Lock,
-  CheckCircle, Play, ChevronRight, AlertCircle
+  CheckCircle, Play, AlertCircle, Loader2
 } from 'lucide-react';
-import { mockTryOuts, TryOut } from '../data/mockData';
 import { useTryouts } from '../hooks/useTryouts';
 import { useAuth } from '../context/AuthContext';
+import { mockPackages } from '../data/mockData';
 
 export default function TryOutListPage() {
   const { user } = useAuth();
@@ -19,9 +19,11 @@ export default function TryOutListPage() {
     return raw ? JSON.parse(raw) : [];
   }, []);
 
-  // Merge completion status
+  // Fetch tryouts dari backend — NO MOCK FALLBACK
   const { tryouts: backendTryouts, loading: tryoutsLoading } = useTryouts();
-  const tryOuts = (backendTryouts.length > 0 ? backendTryouts : mockTryOuts).map(t => ({
+
+  // Merge completion status
+  const allTryouts = backendTryouts.map(t => ({
     ...t,
     isCompleted: completedIds.includes(t.id) || t.isCompleted,
   }));
@@ -38,6 +40,16 @@ export default function TryOutListPage() {
     return [];
   }, [user]);
 
+  // Cari jumlah tryout yang termasuk dalam paket user
+  const maxTryouts = React.useMemo(() => {
+    if (!user?.packageType) return 0;
+    const pkg = mockPackages.find(p =>
+      p.name.toLowerCase() === (user.packageType || '').toLowerCase() ||
+      (user.packageType || '').toLowerCase().includes(p.name.toLowerCase().split(' ')[1]?.toLowerCase() || '')
+    );
+    return pkg?.includedTryOuts || 999;
+  }, [user]);
+
   // Label paket untuk header
   const packageLabel = React.useMemo(() => {
     if (!user?.hasPurchasedPackage) return null;
@@ -51,12 +63,19 @@ export default function TryOutListPage() {
     return user.packageType;
   }, [user]);
 
-  // Filter: hanya tampilkan tryout sesuai paket + search
-  const filteredTryOuts = tryOuts.filter(t => {
-    const matchSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchPackage = allowedCategories.includes(t.category);
-    return matchSearch && matchPackage;
-  });
+  // Filter: sesuai kategori paket + search + batasi sesuai jumlah paket
+  const filteredTryOuts = React.useMemo(() => {
+    const byCategory = allTryouts.filter(t => {
+      const matchPackage = allowedCategories.includes(t.category);
+      return matchPackage;
+    });
+    // Batasi sesuai jumlah paket (ambil yang pertama N)
+    const limited = byCategory.slice(0, maxTryouts);
+    // Lalu filter search
+    return limited.filter(t =>
+      t.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [allTryouts, allowedCategories, maxTryouts, searchQuery]);
 
   const completedCount = filteredTryOuts.filter(t => t.isCompleted).length;
 
@@ -118,7 +137,7 @@ export default function TryOutListPage() {
       {/* ── Search ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 w-[18px] h-[18px] text-gray-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
           <input
             type="text"
             placeholder="Cari try out..."
@@ -129,17 +148,29 @@ export default function TryOutListPage() {
         </div>
       </motion.div>
 
-      {/* ── Grid Try Out ── */}
-      {filteredTryOuts.length === 0 ? (
+      {/* ── Loading state ── */}
+      {tryoutsLoading ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Memuat try out...</p>
+        </div>
+      ) : filteredTryOuts.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-600">
-            {searchQuery ? 'Try out tidak ditemukan' : 'Belum ada try out tersedia'}
+            {searchQuery ? 'Try out tidak ditemukan' : allTryouts.length === 0
+              ? 'Try out belum tersedia'
+              : 'Tidak ada try out untuk paket ini'}
           </p>
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} className="mt-2 text-sm text-[#2563EB] hover:underline">
               Hapus pencarian
             </button>
+          )}
+          {!searchQuery && allTryouts.length === 0 && (
+            <p className="text-sm text-gray-400 mt-1">
+              Admin belum menambahkan try out. Coba lagi nanti.
+            </p>
           )}
         </div>
       ) : (
@@ -171,11 +202,9 @@ export default function TryOutListPage() {
                       </span>
                     ) : null}
                   </div>
-
                   <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight">{tryOut.title}</h3>
                 </div>
 
-                {/* Divider */}
                 <div className="border-t border-gray-50 mx-5" />
 
                 {/* Stats */}
@@ -193,19 +222,21 @@ export default function TryOutListPage() {
                 </div>
 
                 {/* Subtes tags */}
-                <div className="px-5 pb-3">
-                  <p className="text-xs text-gray-400 mb-1.5">Materi:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tryOut.subjects.slice(0, 4).map((sub: any, j: number) => (
-                      <span key={j} className="text-xs bg-gray-50 border border-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-medium">
-                        {typeof sub === 'string' ? sub : sub.code}
-                      </span>
-                    ))}
-                    {tryOut.subjects.length > 4 && (
-                      <span className="text-xs text-gray-400 px-1">+{tryOut.subjects.length - 4}</span>
-                    )}
+                {tryOut.subjects && tryOut.subjects.length > 0 && (
+                  <div className="px-5 pb-3">
+                    <p className="text-xs text-gray-400 mb-1.5">Materi:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tryOut.subjects.slice(0, 4).map((sub: any, j: number) => (
+                        <span key={j} className="text-xs bg-gray-50 border border-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-medium">
+                          {typeof sub === 'string' ? sub : sub.code}
+                        </span>
+                      ))}
+                      {tryOut.subjects.length > 4 && (
+                        <span className="text-xs text-gray-400 px-1">+{tryOut.subjects.length - 4}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Action */}
                 <div className="px-5 pb-5 mt-auto pt-2">
@@ -242,22 +273,24 @@ export default function TryOutListPage() {
       )}
 
       {/* ── Tips box ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex items-start gap-4">
-          <div className="w-9 h-9 rounded-xl bg-[#2563EB] flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-4.5 h-4.5 w-[18px] h-[18px] text-white" />
+      {!tryoutsLoading && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex items-start gap-4">
+            <div className="w-9 h-9 rounded-xl bg-[#2563EB] flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-[18px] h-[18px] text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 mb-1.5">Tips Mengerjakan Try Out</p>
+              <ul className="space-y-1 text-sm text-gray-600">
+                <li>• Pastikan koneksi internet stabil sebelum mulai</li>
+                <li>• Timer per subtes berjalan otomatis — kelola waktu dengan baik</li>
+                <li>• Tandai soal yang ragu dengan ikon bendera untuk direview nanti</li>
+                <li>• Jawaban tersimpan otomatis setiap 30 detik</li>
+              </ul>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900 mb-1.5">Tips Mengerjakan Try Out</p>
-            <ul className="space-y-1 text-sm text-gray-600">
-              <li>• Pastikan koneksi internet stabil sebelum mulai</li>
-              <li>• Timer per subtes berjalan otomatis — kelola waktu dengan baik</li>
-              <li>• Tandai soal yang ragu dengan ikon bendera untuk direview nanti</li>
-              <li>• Jawaban tersimpan otomatis setiap 30 detik</li>
-            </ul>
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }
