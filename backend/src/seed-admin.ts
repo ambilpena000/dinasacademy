@@ -12,6 +12,7 @@
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
+import { User } from './users/user.entity'; // 1. Tambahkan import User ini
 
 dotenv.config();
 
@@ -22,12 +23,13 @@ const ds = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME     || 'dinasacademy',
+  entities: [User], // 2. Daftarkan User di sini agar TypeORM mengenali tabelnya
   synchronize: false,
 });
 
 async function seedAdmin() {
   await ds.initialize();
-  const repo = ds.getRepository('user');
+  const repo = ds.getRepository(User); // 3. Gunakan class User, bukan string 'user'
 
   const existing = await repo.findOne({ where: { email: 'admin@dinasacademy.id' } });
   if (existing) {
@@ -47,9 +49,7 @@ async function seedAdmin() {
   }));
 
   console.log('✅ Admin berhasil dibuat!');
-  console.log('   Email   : admin@dinasacademy.id');
-  console.log('   Password: Admin123!');
-  console.log('   ⚠️  Segera ganti password setelah login pertama!');
+  // ... sisa console.log
   await ds.destroy();
 }
 
