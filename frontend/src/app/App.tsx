@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router';
 import { 
   Home, FileText, BarChart3, Package,
-  User, Menu, X, LogOut, Target
+  User, Menu, X, LogOut, Target, ShoppingBag
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
@@ -24,6 +24,7 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminQuestions from './pages/admin/AdminQuestions';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminSettings from './pages/admin/AdminSettings';
+import PesananPage from './pages/PesananPage';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -83,6 +84,7 @@ function AuthenticatedLayout({
       { icon: FileText, label: 'Try Out', path: '/tryout', requiresPackage: true },
       { icon: BarChart3, label: 'Hasil', path: '/hasil', requiresPackage: true },
       { icon: Package, label: 'Paket', path: '/paket', requiresPackage: false },
+      { icon: ShoppingBag, label: 'Pesanan', path: '/pesanan', requiresPackage: false },
       { icon: User, label: 'Profile', path: '/profile', requiresPackage: false }
     ];
 
@@ -266,6 +268,7 @@ function AuthenticatedLayout({
               { icon: Home, label: 'Home', path: '/dashboard', requiresPackage: true },
               { icon: FileText, label: 'Try Out', path: '/tryout', requiresPackage: true },
               { icon: BarChart3, label: 'Hasil', path: '/hasil', requiresPackage: true },
+              { icon: ShoppingBag, label: 'Pesanan', path: '/pesanan', requiresPackage: false },
               { icon: User, label: 'Profile', path: '/profile', requiresPackage: false }
             ].map((item) => {
               const Icon = item.icon;
@@ -398,6 +401,17 @@ function AppContent() {
           <ProtectedRoute>
             <AuthenticatedLayout>
               <ProfilePage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        } 
+      />
+
+      <Route 
+        path="/pesanan" 
+        element={
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <PesananPage />
             </AuthenticatedLayout>
           </ProtectedRoute>
         } 

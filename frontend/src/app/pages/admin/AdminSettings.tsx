@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Save, Phone, Globe, Mail, Building2,
-  CheckCircle, Eye, EyeOff, AlertCircle, Trash2, RefreshCw
+  CheckCircle, Eye, EyeOff, AlertCircle
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import { api } from '../../lib/api';
 
 interface SiteSettings {
   siteName: string;
@@ -14,6 +15,7 @@ interface SiteSettings {
   maintenanceMode: boolean;
 }
 
+const SETTINGS_KEY = 'site_settings';
 const DEFAULT_SETTINGS: SiteSettings = {
   siteName: 'Dinas Academy',
   whatsappNumber: '6281234567890',
@@ -24,25 +26,26 @@ const DEFAULT_SETTINGS: SiteSettings = {
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState<SiteSettings>(() => {
-    const raw = localStorage.getItem('site_settings');
-    return raw ? JSON.parse(raw) : DEFAULT_SETTINGS;
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
   });
 
   const [adminPassword, setAdminPassword] = useState({ current: '', newPass: '', confirm: '' });
   const [showPass, setShowPass] = useState({ current: false, newPass: false, confirm: false });
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const handleSaveSettings = () => {
-    localStorage.setItem('site_settings', JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     showToast('Pengaturan berhasil disimpan!');
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!adminPassword.current || !adminPassword.newPass || !adminPassword.confirm) {
       showToast('Semua field password harus diisi!', 'error'); return;
     }
@@ -52,20 +55,20 @@ export default function AdminSettings() {
     if (adminPassword.newPass !== adminPassword.confirm) {
       showToast('Konfirmasi password tidak cocok!', 'error'); return;
     }
-    // In real app: call API. For now just validate old password
-    if (adminPassword.current !== 'Admin123!') {
-      showToast('Password lama tidak sesuai!', 'error'); return;
+    setPasswordLoading(true);
+    try {
+      await api.changePassword(adminPassword.current, adminPassword.newPass);
+      showToast('Password admin berhasil diubah!');
+      setAdminPassword({ current: '', newPass: '', confirm: '' });
+    } catch (err: any) {
+      showToast(err?.message || 'Password lama tidak sesuai!', 'error');
+    } finally {
+      setPasswordLoading(false);
     }
-    showToast('Password admin berhasil diubah!');
-    setAdminPassword({ current: '', newPass: '', confirm: '' });
   };
 
-  const handleResetData = (key: string, label: string) => {
-    if (window.confirm(`Yakin hapus semua data ${label}? Tindakan ini tidak bisa dibatalkan.`)) {
-      localStorage.removeItem(key);
-      showToast(`Data ${label} berhasil direset.`);
-    }
-  };
+  const togglePass = (key: keyof typeof showPass) =>
+    setShowPass(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <AdminLayout title="⚙️ Pengaturan" subtitle="Konfigurasi website dan akun admin">
@@ -81,7 +84,7 @@ export default function AdminSettings() {
 
       <div className="space-y-6 max-w-2xl">
 
-        {/* Site Settings */}
+        {/* ── Site Settings ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-sm font-bold text-gray-900 mb-5 flex items-center gap-2">
             <Globe className="w-4 h-4 text-[#2563EB]" /> Pengaturan Website
@@ -138,65 +141,50 @@ export default function AdminSettings() {
           </div>
         </div>
 
-        {/* Change Admin Password */}
+        {/* ── Change Admin Password (real API) ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-gray-900 mb-5 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
             🔐 Ganti Password Admin
           </h2>
+          <p className="text-xs text-gray-400 mb-5">Password akan langsung diperbarui di server</p>
           <div className="space-y-4">
-            {[
-              { key: 'current', label: 'Password Lama', placeholder: 'Masukkan password lama' },
-              { key: 'newPass', label: 'Password Baru', placeholder: 'Minimal 8 karakter' },
-              { key: 'confirm', label: 'Konfirmasi Password Baru', placeholder: 'Ulangi password baru' },
-            ].map(field => (
+            {([
+              { key: 'current', label: 'Password Lama',              placeholder: 'Masukkan password lama' },
+              { key: 'newPass', label: 'Password Baru',              placeholder: 'Minimal 8 karakter' },
+              { key: 'confirm', label: 'Konfirmasi Password Baru',   placeholder: 'Ulangi password baru' },
+            ] as const).map(field => (
               <div key={field.key}>
                 <label className="text-xs font-semibold text-gray-600 mb-1.5 block">{field.label}</label>
                 <div className="relative">
                   <input
-                    type={showPass[field.key as keyof typeof showPass] ? 'text' : 'password'}
-                    value={adminPassword[field.key as keyof typeof adminPassword]}
+                    type={showPass[field.key] ? 'text' : 'password'}
+                    value={adminPassword[field.key]}
                     onChange={e => setAdminPassword({ ...adminPassword, [field.key]: e.target.value })}
                     placeholder={field.placeholder}
                     className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
-                  <button type="button" onClick={() => setShowPass({ ...showPass, [field.key]: !showPass[field.key as keyof typeof showPass] })}
+                  <button type="button" onClick={() => togglePass(field.key)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPass[field.key as keyof typeof showPass] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPass[field.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
             ))}
-            <button onClick={handleChangePassword}
-              className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
-              <Save className="w-4 h-4" /> Ganti Password
+            <button onClick={handleChangePassword} disabled={passwordLoading}
+              className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-70 text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
+              {passwordLoading
+                ? <><svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Menyimpan...</>
+                : <><Save className="w-4 h-4" /> Ganti Password</>}
             </button>
           </div>
         </div>
 
-        {/* Data Management */}
-        <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-red-600 mb-1 flex items-center gap-2">
-            ⚠️ Manajemen Data
-          </h2>
-          <p className="text-xs text-gray-500 mb-5">Reset data localStorage untuk keperluan testing. Tindakan ini tidak dapat dibatalkan.</p>
-          <div className="space-y-3">
-            {[
-              { key: 'exam_results',     label: 'Hasil Try Out',   desc: 'Hapus semua riwayat pengerjaan soal' },
-              { key: 'completed_tryouts',label: 'Try Out Selesai', desc: 'Reset status pengerjaan Try Out' },
-              { key: 'question_bank',    label: 'Bank Soal',       desc: 'Hapus semua soal (akan kembali ke demo)' },
-              { key: 'orders',           label: 'Pesanan',         desc: 'Reset semua data pesanan' },
-              { key: 'all_users',        label: 'Data Pengguna',   desc: 'Hapus semua akun pengguna terdaftar' },
-            ].map(item => (
-              <div key={item.key} className="flex items-center justify-between p-3.5 rounded-xl border border-red-100 bg-red-50/50">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{item.label}</p>
-                  <p className="text-xs text-gray-500">{item.desc}</p>
-                </div>
-                <button onClick={() => handleResetData(item.key, item.label)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 rounded-lg transition-all">
-                  <Trash2 className="w-3.5 h-3.5" /> Reset
-                </button>
-              </div>
-            ))}
+        {/* ── Info ── */}
+        <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
+          <h2 className="text-sm font-bold text-blue-800 mb-2">ℹ️ Informasi Sistem</h2>
+          <div className="space-y-1.5 text-xs text-blue-700">
+            <p>• Data soal, pesanan, dan pengguna disimpan di database PostgreSQL via backend NestJS</p>
+            <p>• Pengaturan website disimpan di localStorage browser (tidak sync antar perangkat)</p>
+            <p>• Untuk reset/manage data server, gunakan pgAdmin atau psql</p>
           </div>
         </div>
 

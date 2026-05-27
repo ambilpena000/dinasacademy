@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, X, Plus, Trash2, Edit3, BookOpen,
-  Save, ChevronDown, CheckCircle, XCircle, AlertCircle
+  Save, ChevronDown, CheckCircle, AlertCircle, Filter
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { api } from '../../lib/api';
@@ -10,8 +10,10 @@ import { api } from '../../lib/api';
 // ── Types ──────────────────────────────────────────────────────────
 interface Question {
   id: string;
+  paket: 'SKD' | 'SNBT' | '';
   subject: string;
-  tryOutId?: string;
+  tryOutId: string;
+  tryOutNumericId?: string; // actual backend id
   questionText: string;
   options: { id: string; text: string }[];
   correctAnswer: string;
@@ -19,47 +21,50 @@ interface Question {
   tips?: string;
 }
 
+interface BackendTryout {
+  id: number | string;
+  title: string;
+  category: string; // 'SKD' | 'SNBT' | etc
+}
+
 const EMPTY_QUESTION: Question = {
-  id: '', subject: '', tryOutId: '', questionText: '',
+  id: '', paket: '', subject: '', tryOutId: '', tryOutNumericId: '',
+  questionText: '',
   options: [{ id: 'a', text: '' }, { id: 'b', text: '' }, { id: 'c', text: '' }, { id: 'd', text: '' }],
   correctAnswer: '', explanation: '', tips: '',
 };
 
-const DEMO_QUESTIONS: Question[] = [
-  {
-    id: 'dq-1', subject: 'TWK', tryOutId: 'TO SKD #1',
-    questionText: 'Pancasila sebagai dasar negara tercantum dalam...',
-    options: [{ id: 'a', text: 'Pembukaan UUD 1945' }, { id: 'b', text: 'Batang tubuh UUD 1945' }, { id: 'c', text: 'Penjelasan UUD 1945' }, { id: 'd', text: 'Tap MPR' }],
-    correctAnswer: 'a', explanation: 'Pancasila tercantum dalam Pembukaan UUD 1945 alinea keempat.', tips: 'Hafal struktur UUD 1945',
-  },
-  {
-    id: 'dq-2', subject: 'TIU', tryOutId: 'TO SKD #1',
-    questionText: 'Jika semua A adalah B, dan sebagian B adalah C, maka...',
-    options: [{ id: 'a', text: 'Semua A adalah C' }, { id: 'b', text: 'Sebagian A mungkin C' }, { id: 'c', text: 'Tidak ada A yang C' }, { id: 'd', text: 'Semua C adalah A' }],
-    correctAnswer: 'b', explanation: 'Karena hanya sebagian B yang adalah C, maka tidak semua A pasti C.', tips: 'Gunakan diagram Venn',
-  },
-  {
-    id: 'dq-3', subject: 'Matematika', tryOutId: 'TO SNBT #1',
-    questionText: 'Jika f(x) = 2x² + 3x - 5, maka f(2) = ...',
-    options: [{ id: 'a', text: '8' }, { id: 'b', text: '9' }, { id: 'c', text: '11' }, { id: 'd', text: '13' }],
-    correctAnswer: 'b', explanation: 'f(2) = 2(4) + 3(2) - 5 = 8 + 6 - 5 = 9', tips: 'Substitusi nilai x = 2',
-  },
-  {
-    id: 'dq-4', subject: 'TKP', tryOutId: 'TO SKD #1',
-    questionText: 'Saat rekan kerja melakukan kesalahan yang merugikan tim, sikap terbaik Anda adalah...',
-    options: [{ id: 'a', text: 'Melaporkan langsung ke atasan' }, { id: 'b', text: 'Mengabaikannya' }, { id: 'c', text: 'Mendiskusikan secara pribadi dan membantu mencari solusi' }, { id: 'd', text: 'Menegur di depan seluruh tim' }],
-    correctAnswer: 'c', explanation: 'Sikap profesional adalah mendiskusikan masalah secara konstruktif.', tips: 'Pilih jawaban yang menunjukkan kerjasama dan empati',
-  },
-  {
-    id: 'dq-5', subject: 'Penalaran Umum', tryOutId: 'TO SNBT #1',
-    questionText: 'Semua siswa yang rajin belajar mendapat nilai bagus. Budi mendapat nilai bagus. Kesimpulan yang tepat adalah...',
-    options: [{ id: 'a', text: 'Budi rajin belajar' }, { id: 'b', text: 'Budi mungkin rajin belajar' }, { id: 'c', text: 'Budi tidak rajin belajar' }, { id: 'd', text: 'Tidak bisa disimpulkan' }],
-    correctAnswer: 'd', explanation: 'Premis hanya menyatakan siswa rajin PASTI dapat nilai bagus, bukan sebaliknya.', tips: 'Hati-hati dengan arah implikasi',
-  },
-];
+// Map category string dari backend ke paket label
+function mapCategory(cat: string): 'SKD' | 'SNBT' | '' {
+  const c = (cat || '').toUpperCase();
+  if (c.includes('SKD') || c.includes('CPNS') || c.includes('SEKDIN') || c.includes('STIS')) return 'SKD';
+  if (c.includes('SNBT') || c.includes('PTN') || c.includes('SBMPTN')) return 'SNBT';
+  return '';
+}
+
+// Subject colors
+const SUBJECT_COLORS: Record<string, string> = {
+  TWK: 'bg-blue-100 text-blue-700',
+  TIU: 'bg-purple-100 text-purple-700',
+  TKP: 'bg-green-100 text-green-700',
+  Matematika: 'bg-orange-100 text-orange-700',
+  'Penalaran Umum': 'bg-sky-100 text-sky-700',
+  'Bahasa Indonesia': 'bg-pink-100 text-pink-700',
+  'Bahasa Inggris': 'bg-indigo-100 text-indigo-700',
+  'Literasi': 'bg-rose-100 text-rose-700',
+  'Kuantitatif': 'bg-amber-100 text-amber-700',
+};
+const getSubjectColor = (s: string) => SUBJECT_COLORS[s] || 'bg-gray-100 text-gray-600';
+
+const PAKET_COLOR: Record<string, string> = {
+  SKD: 'bg-blue-600 text-white',
+  SNBT: 'bg-green-600 text-white',
+};
 
 // ── Delete Confirm Modal ───────────────────────────────────────────
-function DeleteModal({ question, onConfirm, onClose }: { question: Question; onConfirm: () => void; onClose: () => void }) {
+function DeleteModal({ question, onConfirm, onClose, loading }: {
+  question: Question; onConfirm: () => void; onClose: () => void; loading?: boolean;
+}) {
   return (
     <motion.div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
@@ -72,8 +77,11 @@ function DeleteModal({ question, onConfirm, onClose }: { question: Question; onC
         <h3 className="text-base font-bold text-gray-900 text-center mb-2">Hapus Soal?</h3>
         <p className="text-sm text-gray-500 text-center mb-5 line-clamp-2">{question.questionText}</p>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Batal</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold">Ya, Hapus</button>
+          <button onClick={onClose} disabled={loading} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">Batal</button>
+          <button onClick={onConfirm} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold disabled:opacity-70 flex items-center justify-center gap-2">
+            {loading && <svg className="animate-spin w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+            {loading ? 'Menghapus...' : 'Ya, Hapus'}
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -83,17 +91,39 @@ function DeleteModal({ question, onConfirm, onClose }: { question: Question; onC
 export default function AdminQuestions() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [qLoading, setQLoading] = useState(true);
-  const [backendTryouts, setBackendTryouts] = useState<any[]>([]);
+  const [backendTryouts, setBackendTryouts] = useState<BackendTryout[]>([]);
 
-  // Fetch questions & tryouts dari backend
-  React.useEffect(() => {
+  // Filter states
+  const [search, setSearch] = useState('');
+  const [paketFilter, setPaketFilter] = useState<'all' | 'SKD' | 'SNBT'>('all');
+  const [subjectFilter, setSubjectFilter] = useState('all');
+  const [tryOutFilter, setTryOutFilter] = useState('all');
+
+  // Form states
+  const [showForm, setShowForm] = useState(false);
+  const [editingQ, setEditingQ] = useState<Question | null>(null);
+  const [form, setForm] = useState<Question>(EMPTY_QUESTION);
+  const [formLoading, setFormLoading] = useState(false);
+
+  // Delete states
+  const [deleteModal, setDeleteModal] = useState<Question | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // UI states
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // ── Fetch data ────────────────────────────────────────────────────
+  const fetchQuestions = React.useCallback(() => {
     setQLoading(true);
     api.getAllQuestions()
       .then((data: any[]) => {
         const mapped: Question[] = data.map((q: any) => ({
           id: String(q.id),
+          paket: mapCategory(q.tryout?.category || q.category || ''),
           subject: q.subtestName || q.subtestCode || '',
-          tryOutId: q.tryoutId ? String(q.tryoutId) : '',
+          tryOutId: q.tryout?.title || (q.tryoutId ? String(q.tryoutId) : ''),
+          tryOutNumericId: q.tryoutId ? String(q.tryoutId) : '',
           questionText: q.questionText,
           options: [
             { id: 'a', text: q.optionA || '' },
@@ -110,76 +140,118 @@ export default function AdminQuestions() {
       })
       .catch(() => setQuestions([]))
       .finally(() => setQLoading(false));
-
-    api.getTryouts()
-      .then((data: any[]) => setBackendTryouts(data))
-      .catch(() => {});
   }, []);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [tryOutFilter, setTryOutFilter] = useState('all');
-  const [showForm, setShowForm] = useState(false);
-  const [editingQ, setEditingQ] = useState<Question | null>(null);
-  const [form, setForm] = useState<Question>(EMPTY_QUESTION);
-  const [deleteModal, setDeleteModal] = useState<Question | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const saveQuestions = (qs: Question[]) => {
-    setQuestions(qs);
-    // Saved to backend
-  };
+  React.useEffect(() => {
+    fetchQuestions();
+    api.getTryouts()
+      .then((data: any[]) => {
+        setBackendTryouts(data.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          category: t.category || '',
+        })));
+      })
+      .catch(() => {});
+  }, [fetchQuestions]);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSave = () => {
+  // ── Tryouts filtered by selected paket in form ────────────────────
+  const filteredTryoutsForForm = React.useMemo(() => {
+    if (!form.paket) return backendTryouts;
+    return backendTryouts.filter(t => mapCategory(t.category) === form.paket);
+  }, [backendTryouts, form.paket]);
+
+  // ── Save (create/update) ──────────────────────────────────────────
+  const handleSave = async () => {
     if (!form.questionText.trim()) { showToast('Teks soal wajib diisi!', 'error'); return; }
     if (!form.subject.trim()) { showToast('Mata pelajaran wajib diisi!', 'error'); return; }
     if (!form.correctAnswer) { showToast('Tandai jawaban yang benar!', 'error'); return; }
     if (form.options.some(o => !o.text.trim())) { showToast('Semua pilihan jawaban harus diisi!', 'error'); return; }
+    if (!form.tryOutNumericId) { showToast('Pilih Try Out terlebih dahulu!', 'error'); return; }
 
-    if (editingQ) {
-      saveQuestions(questions.map(q => q.id === editingQ.id ? { ...form, id: editingQ.id } : q));
-      showToast('Soal berhasil diperbarui!');
-    } else {
-      saveQuestions([{ ...form, id: `q-${Date.now()}` }, ...questions]);
-      showToast('Soal berhasil ditambahkan!');
+    const payload = {
+      tryoutId: Number(form.tryOutNumericId),
+      subtestCode: form.subject,
+      subtestName: form.subject,
+      questionText: form.questionText,
+      optionA: form.options[0]?.text || '',
+      optionB: form.options[1]?.text || '',
+      optionC: form.options[2]?.text || '',
+      optionD: form.options[3]?.text || '',
+      optionE: form.options[4]?.text || '',
+      correctAnswer: form.correctAnswer,
+      explanation: form.explanation,
+      orderIndex: 0,
+    };
+
+    setFormLoading(true);
+    try {
+      if (editingQ) {
+        await api.updateQuestion(editingQ.id, payload);
+        showToast('Soal berhasil diperbarui!');
+      } else {
+        await api.createQuestion(payload);
+        showToast('Soal berhasil ditambahkan!');
+      }
+      fetchQuestions();
+      cancelForm();
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan soal', 'error');
+    } finally {
+      setFormLoading(false);
     }
-    setShowForm(false);
-    setEditingQ(null);
-    setForm(EMPTY_QUESTION);
   };
 
-  const handleEdit = (q: Question) => { setEditingQ(q); setForm(q); setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleDelete = (q: Question) => setDeleteModal(q);
-  const confirmDelete = () => {
-    if (!deleteModal) return;
-    saveQuestions(questions.filter(q => q.id !== deleteModal.id));
-    showToast('Soal dihapus.');
-    setDeleteModal(null);
+  const handleEdit = (q: Question) => {
+    setEditingQ(q);
+    setForm(q);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setDeleteLoading(true);
+    try {
+      await api.deleteQuestion(deleteModal.id);
+      showToast('Soal dihapus.');
+      fetchQuestions();
+      setDeleteModal(null);
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menghapus soal', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const cancelForm = () => { setShowForm(false); setEditingQ(null); setForm(EMPTY_QUESTION); };
 
-  const subjects  = ['all', ...Array.from(new Set(questions.map(q => q.subject)))];
-  const tryOuts   = ['all', ...Array.from(new Set(questions.map(q => q.tryOutId).filter(Boolean)))];
+  // ── Filter logic ──────────────────────────────────────────────────
+  const subjects = ['all', ...Array.from(new Set(questions.map(q => q.subject).filter(Boolean)))];
+  const tryOutsForFilter = ['all', ...Array.from(new Set(
+    questions
+      .filter(q => paketFilter === 'all' || q.paket === paketFilter)
+      .map(q => q.tryOutId)
+      .filter(Boolean)
+  ))];
 
   const filtered = questions.filter(q => {
-    const matchSearch  = q.questionText.toLowerCase().includes(search.toLowerCase()) || q.subject.toLowerCase().includes(search.toLowerCase());
-    const matchSubject = categoryFilter === 'all' || q.subject === categoryFilter;
-    const matchTryOut  = tryOutFilter === 'all' || q.tryOutId === tryOutFilter;
-    return matchSearch && matchSubject && matchTryOut;
+    const matchSearch = q.questionText.toLowerCase().includes(search.toLowerCase()) || q.subject.toLowerCase().includes(search.toLowerCase());
+    const matchPaket = paketFilter === 'all' || q.paket === paketFilter;
+    const matchSubject = subjectFilter === 'all' || q.subject === subjectFilter;
+    const matchTryOut = tryOutFilter === 'all' || q.tryOutId === tryOutFilter;
+    return matchSearch && matchPaket && matchSubject && matchTryOut;
   });
 
-  const subjectColors: Record<string, string> = {
-    TWK: 'bg-blue-100 text-blue-700', TIU: 'bg-purple-100 text-purple-700',
-    TKP: 'bg-green-100 text-green-700', Matematika: 'bg-orange-100 text-orange-700',
-    'Penalaran Umum': 'bg-sky-100 text-sky-700', 'Bahasa Indonesia': 'bg-pink-100 text-pink-700',
-    'Bahasa Inggris': 'bg-indigo-100 text-indigo-700',
-  };
-  const getSubjectColor = (s: string) => subjectColors[s] || 'bg-gray-100 text-gray-600';
+  // Stats
+  const skdCount = questions.filter(q => q.paket === 'SKD').length;
+  const snbtCount = questions.filter(q => q.paket === 'SNBT').length;
+  const tryOutCount = new Set(questions.map(q => q.tryOutId).filter(Boolean)).size;
 
   return (
     <AdminLayout title="📝 Bank Soal" subtitle="Tambah, edit, dan kelola soal Try Out"
@@ -191,7 +263,14 @@ export default function AdminQuestions() {
       }>
 
       <AnimatePresence>
-        {deleteModal && <DeleteModal question={deleteModal} onConfirm={confirmDelete} onClose={() => setDeleteModal(null)} />}
+        {deleteModal && (
+          <DeleteModal
+            question={deleteModal}
+            onConfirm={confirmDelete}
+            onClose={() => !deleteLoading && setDeleteModal(null)}
+            loading={deleteLoading}
+          />
+        )}
         {toast && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
             className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-semibold flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
@@ -203,7 +282,7 @@ export default function AdminQuestions() {
 
       <div className="space-y-5">
 
-        {/* Form Add/Edit */}
+        {/* ── Form Add/Edit ── */}
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
@@ -214,20 +293,58 @@ export default function AdminQuestions() {
               </div>
               <div className="p-6 space-y-5">
 
-                {/* Row 1: Subject + TryOut */}
+                {/* Row 1: Paket + TryOut */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Mata Pelajaran / Subtes *</label>
-                    <input type="text" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
-                      placeholder="TWK / TIU / TKP / Matematika / dll"
-                      className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
+                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Paket *</label>
+                    <div className="relative">
+                      <select value={form.paket} onChange={e => setForm({ ...form, paket: e.target.value as any, tryOutId: '', tryOutNumericId: '' })}
+                        className="w-full appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700">
+                        <option value="">-- Pilih Paket --</option>
+                        <option value="SKD">SKD (CPNS/Sekdin/STIS)</option>
+                        <option value="SNBT">SNBT (PTN/Universitas)</option>
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Try Out (opsional)</label>
-                    <input type="text" value={form.tryOutId || ''} onChange={e => setForm({ ...form, tryOutId: e.target.value })}
-                      placeholder="Contoh: TO SNBT #1 / TO SKD #2"
-                      className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
+                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Try Out *</label>
+                    <div className="relative">
+                      <select value={form.tryOutNumericId || ''}
+                        onChange={e => {
+                          const selected = backendTryouts.find(t => String(t.id) === e.target.value);
+                          setForm({ ...form, tryOutNumericId: e.target.value, tryOutId: selected?.title || e.target.value });
+                        }}
+                        className="w-full appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700"
+                        disabled={!form.paket && filteredTryoutsForForm.length === 0}>
+                        <option value="">{form.paket ? `-- Pilih Try Out ${form.paket} --` : '-- Pilih Paket dulu --'}</option>
+                        {filteredTryoutsForForm.map(t => (
+                          <option key={t.id} value={String(t.id)}>{t.title}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
+                </div>
+
+                {/* Subject */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Mata Pelajaran / Subtes *</label>
+                  <input type="text" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
+                    placeholder={form.paket === 'SKD' ? 'TWK / TIU / TKP' : form.paket === 'SNBT' ? 'Matematika / Penalaran Umum / Bahasa Indonesia / dll' : 'Mata pelajaran...'}
+                    className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
+                  {/* Quick pick subject */}
+                  {form.paket && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {(form.paket === 'SKD' ? ['TWK', 'TIU', 'TKP'] : ['Matematika', 'Penalaran Umum', 'Bahasa Indonesia', 'Bahasa Inggris', 'Literasi', 'Kuantitatif']).map(s => (
+                        <button key={s} type="button"
+                          onClick={() => setForm({ ...form, subject: s })}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${form.subject === s ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-[#2563EB] hover:text-[#2563EB]'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Question Text */}
@@ -266,7 +383,7 @@ export default function AdminQuestions() {
                   </div>
                 </div>
 
-                {/* Row: Explanation + Tips */}
+                {/* Explanation + Tips */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Pembahasan</label>
@@ -284,11 +401,14 @@ export default function AdminQuestions() {
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-1">
-                  <button onClick={cancelForm} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">
+                  <button onClick={cancelForm} disabled={formLoading} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
                     Batal
                   </button>
-                  <button onClick={handleSave} className="flex-1 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-sm font-semibold transition-all flex items-center justify-center gap-2">
-                    <Save className="w-4 h-4" /> {editingQ ? 'Simpan Perubahan' : 'Tambah Soal'}
+                  <button onClick={handleSave} disabled={formLoading} className="flex-1 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-70">
+                    {formLoading
+                      ? <><svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Menyimpan...</>
+                      : <><Save className="w-4 h-4" /> {editingQ ? 'Simpan Perubahan' : 'Tambah Soal'}</>
+                    }
                   </button>
                 </div>
               </div>
@@ -296,12 +416,13 @@ export default function AdminQuestions() {
           )}
         </AnimatePresence>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total Soal',       value: questions.length,                                             color: 'text-blue-600',   bg: 'bg-blue-50' },
-            { label: 'Mata Pelajaran',   value: new Set(questions.map(q => q.subject)).size,                  color: 'text-purple-600', bg: 'bg-purple-50' },
-            { label: 'Try Out Tercakup', value: new Set(questions.map(q => q.tryOutId).filter(Boolean)).size, color: 'text-green-600',  bg: 'bg-green-50' },
+            { label: 'Total Soal',    value: questions.length,  color: 'text-blue-600',   bg: 'bg-blue-50' },
+            { label: 'Soal SKD',      value: skdCount,          color: 'text-indigo-600', bg: 'bg-indigo-50' },
+            { label: 'Soal SNBT',     value: snbtCount,         color: 'text-green-600',  bg: 'bg-green-50' },
+            { label: 'Try Out',       value: tryOutCount,       color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map(s => (
             <div key={s.label} className={`${s.bg} rounded-2xl p-4 text-center border border-white`}>
               <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
@@ -310,41 +431,78 @@ export default function AdminQuestions() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Cari soal..." value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
+        {/* ── Filters ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <Filter className="w-3.5 h-3.5" /> Filter Soal
           </div>
-          <div className="relative">
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-              className="appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700">
-              {subjects.map(s => <option key={s} value={s}>{s === 'all' ? 'Semua Mapel' : s}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+          {/* Paket filter - pill tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { value: 'all', label: 'Semua Paket' },
+              { value: 'SKD', label: '🏛️ SKD' },
+              { value: 'SNBT', label: '🎓 SNBT' },
+            ].map(tab => (
+              <button key={tab.value} onClick={() => { setPaketFilter(tab.value as any); setTryOutFilter('all'); setSubjectFilter('all'); }}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${paketFilter === tab.value ? 'bg-[#2563EB] text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="relative">
-            <select value={tryOutFilter} onChange={e => setTryOutFilter(e.target.value)}
-              className="appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700">
-              {tryOuts.map(t => <option key={t} value={t}>{t === 'all' ? 'Semua Try Out' : t}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+          {/* Second row: mapel + tryout + search */}
+          <div className="flex flex-wrap gap-3">
+            {/* Mapel filter */}
+            <div className="relative">
+              <select value={subjectFilter} onChange={e => setSubjectFilter(e.target.value)}
+                className="appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700 min-w-[150px]">
+                {subjects.map(s => <option key={s} value={s}>{s === 'all' ? 'Semua Mapel' : s}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Try Out filter */}
+            <div className="relative">
+              <select value={tryOutFilter} onChange={e => setTryOutFilter(e.target.value)}
+                className="appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700 min-w-[160px]">
+                {tryOutsForFilter.map(t => <option key={t} value={t}>{t === 'all' ? 'Semua Try Out' : t}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Search */}
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" placeholder="Cari soal atau mapel..." value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
+            </div>
           </div>
         </div>
 
-        {/* Questions List */}
+        {/* ── Questions List ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {filtered.length === 0 ? (
+          {qLoading ? (
+            <div className="py-16 text-center text-gray-400">
+              <svg className="animate-spin w-8 h-8 mx-auto mb-2 text-[#2563EB]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              <p className="text-sm">Memuat soal...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <BookOpen className="w-8 h-8 mx-auto mb-2" />
-              <p className="text-sm">Tidak ada soal ditemukan</p>
+              <p className="text-sm font-medium">Tidak ada soal ditemukan</p>
+              {(paketFilter !== 'all' || subjectFilter !== 'all' || tryOutFilter !== 'all' || search) && (
+                <button onClick={() => { setPaketFilter('all'); setSubjectFilter('all'); setTryOutFilter('all'); setSearch(''); }}
+                  className="mt-2 text-xs text-[#2563EB] hover:underline">Reset filter</button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
               {filtered.map((q, i) => (
                 <motion.div key={q.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
-                  {/* Question row */}
                   <div className="p-5 hover:bg-gray-50/30 transition-colors">
                     <div className="flex items-start gap-4">
                       {/* Number */}
@@ -354,6 +512,11 @@ export default function AdminQuestions() {
                       <div className="flex-1 min-w-0">
                         {/* Tags */}
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {q.paket && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${PAKET_COLOR[q.paket] || 'bg-gray-200 text-gray-700'}`}>
+                              {q.paket}
+                            </span>
+                          )}
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getSubjectColor(q.subject)}`}>
                             {q.subject}
                           </span>
@@ -381,7 +544,7 @@ export default function AdminQuestions() {
                           </button>
                         )}
                         {expandedId === q.id && (
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                             className="mt-3 space-y-2">
                             {q.explanation && (
                               <div className="bg-blue-50 rounded-xl p-3">
@@ -403,7 +566,7 @@ export default function AdminQuestions() {
                         <button onClick={() => handleEdit(q)} className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg transition-all" title="Edit">
                           <Edit3 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(q)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="Hapus">
+                        <button onClick={() => setDeleteModal(q)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="Hapus">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -414,7 +577,13 @@ export default function AdminQuestions() {
             </div>
           )}
         </div>
-        <p className="text-xs text-gray-400 text-right">Menampilkan {filtered.length} dari {questions.length} soal</p>
+
+        <p className="text-xs text-gray-400 text-right">
+          Menampilkan {filtered.length} dari {questions.length} soal
+          {paketFilter !== 'all' && ` · Paket: ${paketFilter}`}
+          {subjectFilter !== 'all' && ` · Mapel: ${subjectFilter}`}
+          {tryOutFilter !== 'all' && ` · TO: ${tryOutFilter}`}
+        </p>
       </div>
     </AdminLayout>
   );

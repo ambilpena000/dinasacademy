@@ -1,38 +1,23 @@
-import { Controller, Post, Put, Body, UseGuards, Request, Get } from '@nestjs/common';
+import {
+  Controller, Post, Put, Get, Body,
+  UseGuards, Request, Query, BadRequestException,
+} from '@nestjs/common';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 export class RegisterDto {
-  @IsNotEmpty({ message: 'Nama wajib diisi' })
-  @IsString()
-  name!: string;
-
-  @IsEmail({}, { message: 'Format email tidak valid' })
-  @IsNotEmpty({ message: 'Email wajib diisi' })
-  email!: string;
-
-  @IsNotEmpty({ message: 'Password wajib diisi' })
-  @MinLength(6, { message: 'Password minimal 6 karakter' })
-  password!: string;
+  @IsNotEmpty({ message: 'Nama wajib diisi' }) @IsString() name!: string;
+  @IsEmail({}, { message: 'Format email tidak valid' }) @IsNotEmpty() email!: string;
+  @IsNotEmpty() @MinLength(6, { message: 'Password minimal 6 karakter' }) password!: string;
 }
-
 export class LoginDto {
-  @IsEmail({}, { message: 'Format email tidak valid' })
-  @IsNotEmpty({ message: 'Email wajib diisi' })
-  email!: string;
-
-  @IsNotEmpty({ message: 'Password wajib diisi' })
-  password!: string;
+  @IsEmail({}, { message: 'Format email tidak valid' }) @IsNotEmpty() email!: string;
+  @IsNotEmpty() password!: string;
 }
-
 export class ChangePasswordDto {
-  @IsNotEmpty()
-  oldPassword!: string;
-
-  @IsNotEmpty()
-  @MinLength(6)
-  newPassword!: string;
+  @IsNotEmpty() oldPassword!: string;
+  @IsNotEmpty() @MinLength(8, { message: 'Password baru minimal 8 karakter' }) newPassword!: string;
 }
 
 @Controller('auth')
@@ -49,7 +34,6 @@ export class AuthController {
     return this.authService.login(dto.email, dto.password);
   }
 
-  // Frontend memanggil GET /auth/me
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getMe(@Request() req: any) {
@@ -62,10 +46,23 @@ export class AuthController {
     return this.authService.getFullUser(req.user.id);
   }
 
-  // Frontend memanggil PUT /auth/change-password
   @UseGuards(JwtAuthGuard)
   @Put('change-password')
   changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(req.user.id, dto.oldPassword, dto.newPassword);
+  }
+
+  // FIX #7: verifikasi email via link
+  @Get('verify-email')
+  verifyEmail(@Query('token') token: string) {
+    if (!token) throw new BadRequestException('Token tidak ditemukan');
+    return this.authService.verifyEmail(token);
+  }
+
+  // FIX #7: kirim ulang email verifikasi
+  @UseGuards(JwtAuthGuard)
+  @Post('resend-verification')
+  resendVerification(@Request() req: any) {
+    return this.authService.resendVerification(req.user.id);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -16,41 +16,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  // Dipanggil otomatis setelah token valid
-  // Sertakan hasPurchasedPackage & packageType agar tryouts controller bisa filter
+  // BUG FIX #1 (lanjutan): tidak ada lagi pengecekan hardcode 'admin'
+  // Semua user (termasuk admin) diambil dari DB — hasPurchasedPackage selalu fresh
   async validate(payload: any) {
-    // Admin hardcode
-    if (payload.sub === 'admin' || payload.role === 'admin') {
-      return {
-        id: 'admin',
-        email: payload.email,
-        role: 'admin',
-        hasPurchasedPackage: true,
-        packageType: null,
-      };
-    }
-
-    // User biasa: ambil data terbaru dari DB
     try {
       const user = await this.usersService.findOne(Number(payload.sub));
-      if (user) {
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          hasPurchasedPackage: user.hasPurchasedPackage,
-          packageType: user.packageType,
-        };
-      }
-    } catch {}
-
-    // Fallback jika DB tidak terjangkau
-    return {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      hasPurchasedPackage: false,
-      packageType: null,
-    };
+      if (!user) throw new UnauthorizedException('Token tidak valid');
+      return {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        hasPurchasedPackage: user.hasPurchasedPackage,
+        packageType: user.packageType,
+      };
+    } catch {
+      throw new UnauthorizedException('Token tidak valid atau sudah kadaluarsa');
+    }
   }
 }

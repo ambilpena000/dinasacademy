@@ -11,12 +11,12 @@ import { UsersModule } from '../users/users.module';
   imports: [
     UsersModule,
     PassportModule,
-    // JWT secret diambil dari .env via ConfigService
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET', 'dinasacademy_secret'),
+        // FIX #6: token default 7d, bisa diubah di .env JWT_EXPIRES_IN
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') as any },
       }),
     }),

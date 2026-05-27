@@ -10,18 +10,16 @@ export class OrdersService {
     private orderRepo: Repository<Order>,
   ) {}
 
-  async createOrder(userId: number, data: { packageName: string; packageType: string; amount: number; paymentMethod: string }) {
-    const uniqueCode = Math.floor(Math.random() * 900) + 100; // 100–999
+  async createOrder(userId: number, data: {
+    packageName: string;
+    packageType: string;
+    amount: number;
+    paymentMethod: string;
+  }) {
+    const uniqueCode  = Math.floor(Math.random() * 900) + 100; // 100–999
     const totalAmount = data.amount + uniqueCode;
     const order = this.orderRepo.create({
-      userId,
-      packageName: data.packageName,
-      packageType: data.packageType,
-      amount: data.amount,
-      uniqueCode,
-      totalAmount,
-      paymentMethod: data.paymentMethod,
-      status: 'pending',
+      userId, ...data, uniqueCode, totalAmount, status: 'pending',
     });
     return this.orderRepo.save(order);
   }
@@ -35,7 +33,6 @@ export class OrdersService {
   }
 
   async handlePaymentWebhook(body: any) {
-    // implementasi sesuai kebutuhan
     return { received: true };
   }
 
@@ -45,12 +42,10 @@ export class OrdersService {
     return order;
   }
 
-  async activateOrder(id: number) {
-    await this.findOne(id); // validate exists
-    await this.orderRepo.update(id, {
-      status: 'active',
-      activatedAt: new Date(),
-    });
+  // FIX #4: activateOrder kembalikan userId & packageType agar controller bisa update user
+  async activateOrder(id: number): Promise<Order> {
+    await this.findOne(id);
+    await this.orderRepo.update(id, { status: 'active', activatedAt: new Date() });
     return this.findOne(id);
   }
 

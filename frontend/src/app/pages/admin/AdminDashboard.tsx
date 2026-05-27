@@ -51,6 +51,7 @@ export default function AdminDashboard() {
 
   const [totalUsers, setTotalUsers] = React.useState<number>(0);
   const [totalQuestions, setTotalQuestions] = React.useState<number>(0);
+  const [totalTryouts, setTotalTryouts] = React.useState<number>(0);
 
   React.useEffect(() => {
     // Fetch users dari backend
@@ -65,16 +66,22 @@ export default function AdminDashboard() {
       api.getAllQuestions()
         .then((qs: any[]) => setTotalQuestions(qs.length))
         .catch(() => {});
+
+      // Fetch tryouts count
+      api.getTryouts()
+        .then((ts: any[]) => setTotalTryouts(ts.length))
+        .catch(() => {});
     });
   }, []);
 
   const stats = [
-    { label: 'Total Pesanan',          value: totalOrders,            icon: <Package className="w-5 h-5" />,     bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100' },
-    { label: 'Menunggu Konfirmasi',    value: pendingOrders,          icon: <Clock className="w-5 h-5" />,       bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100' },
-    { label: 'Paket Aktif',            value: activeOrders,           icon: <CheckCircle className="w-5 h-5" />, bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100' },
-    { label: 'Total Pendapatan',       value: formatRupiah(totalRevenue), icon: <TrendingUp className="w-5 h-5" />, bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' },
-    { label: 'Pengguna Terdaftar',     value: totalUsers,             icon: <Users className="w-5 h-5" />,       bg: 'bg-sky-50',    text: 'text-sky-600',    border: 'border-sky-100' },
-    { label: 'Total Soal',             value: totalQuestions,         icon: <FileQuestion className="w-5 h-5" />,bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100' },
+    { label: 'Total Pesanan',       value: totalOrders,               icon: <Package className="w-5 h-5" />,     bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100',   link: '/admin/orders' },
+    { label: 'Menunggu Konfirmasi', value: pendingOrders,             icon: <Clock className="w-5 h-5" />,       bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', link: '/admin/orders' },
+    { label: 'Paket Aktif',         value: activeOrders,              icon: <CheckCircle className="w-5 h-5" />, bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100',  link: '/admin/orders' },
+    { label: 'Total Pendapatan',    value: formatRupiah(totalRevenue),icon: <TrendingUp className="w-5 h-5" />, bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', link: null },
+    { label: 'Pengguna Terdaftar',  value: totalUsers,                icon: <Users className="w-5 h-5" />,       bg: 'bg-sky-50',    text: 'text-sky-600',    border: 'border-sky-100',    link: '/admin/users' },
+    { label: 'Total Soal',          value: totalQuestions,            icon: <FileQuestion className="w-5 h-5" />,bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100', link: '/admin/questions' },
+    { label: 'Try Out Tersedia',    value: totalTryouts,              icon: <FileQuestion className="w-5 h-5" />,bg: 'bg-teal-50',   text: 'text-teal-600',   border: 'border-teal-100',   link: null },
   ];
 
   const pending = orders.filter(o => o.status === 'pending');
@@ -84,16 +91,26 @@ export default function AdminDashboard() {
       <div className="space-y-6">
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {stats.map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-              <div className={`bg-white rounded-2xl p-5 border ${s.border} shadow-sm hover:shadow-md transition-shadow`}>
-                <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.text} mb-3`}>
-                  {s.icon}
+              {s.link ? (
+                <Link to={s.link} className={`block bg-white rounded-2xl p-5 border ${s.border} shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}>
+                  <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.text} mb-3`}>
+                    {s.icon}
+                  </div>
+                  <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 font-medium">{s.label}</p>
+                </Link>
+              ) : (
+                <div className={`bg-white rounded-2xl p-5 border ${s.border} shadow-sm hover:shadow-md transition-shadow`}>
+                  <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.text} mb-3`}>
+                    {s.icon}
+                  </div>
+                  <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 font-medium">{s.label}</p>
                 </div>
-                <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5 font-medium">{s.label}</p>
-              </div>
+              )}
             </motion.div>
           ))}
         </div>

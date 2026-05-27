@@ -25,22 +25,38 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [univSearch, setUnivSearch] = useState('');
   const [showUnivDropdown, setShowUnivDropdown] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(() => {
-    return localStorage.getItem(`profile_photo_${user?.id}`) || null;
-  });
+  // FIX #5/#7: foto dari server (user.photoUrl), bukan base64 di localStorage
+  const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
+  const [photoUrl, setPhotoUrl] = useState<string | null>(
+    user?.photoUrl ? `${BASE_URL}${user.photoUrl}` : null
+  );
+  const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('Ukuran foto maksimal 2MB'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPhotoUrl(dataUrl);
-      localStorage.setItem(`profile_photo_${user?.id}`, dataUrl);
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 3 * 1024 * 1024) { alert('Ukuran foto maksimal 3MB'); return; }
+    if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) { alert('Hanya file gambar (jpg, png, webp) yang diizinkan'); return; }
+
+    // Tampilkan preview lokal dulu (UX responsif)
+    const localUrl = URL.createObjectURL(file);
+    setPhotoUrl(localUrl);
+    setPhotoUploading(true);
+
+    try {
+      const { api } = await import('../lib/api');
+      const result = await api.uploadPhoto(file);
+      // Ganti preview lokal dengan URL server
+      setPhotoUrl(`${BASE_URL}${result.photoUrl}`);
+      updateProfile({ photoUrl: result.photoUrl });
+    } catch (err: any) {
+      alert(err.message || 'Gagal upload foto. Coba lagi.');
+      setPhotoUrl(user?.photoUrl ? `${BASE_URL}${user.photoUrl}` : null);
+    } finally {
+      setPhotoUploading(false);
+      URL.revokeObjectURL(localUrl);
+    }
   };
 
   const [showAssessment, setShowAssessment] = useState(false);
@@ -212,14 +228,17 @@ export default function ProfilePage() {
                     }
                   </div>
                   <button
-                    onClick={() => photoInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center text-white hover:bg-[#1d4ed8] transition-all shadow-md"
+                    onClick={() => !photoUploading && photoInputRef.current?.click()}
+                    disabled={photoUploading}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center text-white hover:bg-[#1d4ed8] transition-all shadow-md disabled:opacity-70"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    {photoUploading
+                      ? <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      : <Edit2 className="w-4 h-4" />}
                   </button>
-                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                  <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} className="hidden" />
                 </div>
-                <p className="text-xs text-gray-400 mb-2">Klik foto untuk mengganti</p>
+                <p className="text-xs text-gray-400 mb-2">{photoUploading ? 'Mengupload...' : 'Klik foto untuk mengganti'}</p>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">{user.name}</h2>
                 <p className="text-sm text-gray-600 mb-4">{user.email}</p>
                 {user.hasPurchasedPackage && user.packageType ? (
@@ -283,9 +302,14 @@ export default function ProfilePage() {
                     <p className="text-blue-100 text-sm">Status: Aktif</p>
                   </div>
                 </div>
-                <Link to="/paket">
-                  <Button className="w-full bg-white text-blue-600 hover:bg-blue-50 font-semibold">Kelola Paket</Button>
-                </Link>
+                <div className="space-y-2">
+                  <Link to="/pesanan">
+                    <Button className="w-full bg-white text-blue-600 hover:bg-blue-50 font-semibold">📋 Lihat Pesanan Saya</Button>
+                  </Link>
+                  <Link to="/paket">
+                    <Button className="w-full bg-white/20 text-white hover:bg-white/30 font-semibold border border-white/30">Kelola Paket</Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           )}

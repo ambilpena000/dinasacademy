@@ -31,14 +31,18 @@ export class Question {
   @Column('text')
   optionD!: string;
 
-  @Column('text')
+  @Column('text', { default: '' })
   optionE!: string;
 
   @Column()
-  correctAnswer!: string; // misal 'A'
+  correctAnswer!: string;
 
   @Column('text', { nullable: true })
   explanation?: string;
+
+  // BUG FIX #4: field tips sekarang tersimpan ke DB
+  @Column('text', { nullable: true })
+  tips?: string;
 
   @Column()
   orderIndex!: number;

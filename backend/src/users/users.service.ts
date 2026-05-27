@@ -12,14 +12,10 @@ export class UsersService {
 
   async findOne(id: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('User tidak ditemukan');
     return user;
   }
 
-  /**
-   * Cari user beserta field password (yang default select: false).
-   * Digunakan oleh AuthService untuk login & change password.
-   */
   async findOneWithPassword(id: number): Promise<User | null> {
     return this.userRepo
       .createQueryBuilder('user')
@@ -28,14 +24,20 @@ export class UsersService {
       .getOne();
   }
 
-  /**
-   * Cari user by email, termasuk password (untuk login).
-   */
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepo
       .createQueryBuilder('user')
       .addSelect('user.password')
       .where('user.email = :email', { email })
+      .getOne();
+  }
+
+  // FIX #7: cari user by token verifikasi email
+  async findByVerifyToken(token: string): Promise<User | null> {
+    return this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.emailVerifyToken')
+      .where('user.emailVerifyToken = :token', { token })
       .getOne();
   }
 
@@ -45,11 +47,11 @@ export class UsersService {
   }
 
   async update(id: number, data: Partial<User>): Promise<User> {
-    await this.userRepo.update(id, data);
+    await this.userRepo.update(id, data as any);
     return this.findOne(id);
   }
 
   async findAll(): Promise<User[]> {
-    return this.userRepo.find();
+    return this.userRepo.find({ order: { joinDate: 'DESC' } });
   }
 }

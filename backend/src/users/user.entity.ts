@@ -23,7 +23,6 @@ export class User {
   @Column({ nullable: true })
   photoUrl?: string;
 
-  // FIX: tambah phone dan school yang sebelumnya tidak ada
   @Column({ nullable: true })
   phone?: string;
 
@@ -50,6 +49,13 @@ export class User {
 
   @Column({ nullable: true })
   packageType?: string;
+
+  // FIX #7: email verifikasi — token dan status
+  @Column({ default: false })
+  isEmailVerified!: boolean;
+
+  @Column({ nullable: true, select: false })
+  emailVerifyToken?: string;
 
   @CreateDateColumn()
   joinDate!: Date;

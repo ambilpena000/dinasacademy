@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, CheckCircle, XCircle, Users,
-  Package, ShieldCheck, User, X, Eye
+  Package, ShieldCheck, User, X, Eye, RefreshCw
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import { api } from '../../lib/api';
 
 interface StoredUser {
   id: string;
@@ -15,6 +16,11 @@ interface StoredUser {
   packageType?: string;
   joinDate?: string;
   profileCompleted?: boolean;
+  phone?: string;
+  school?: string;
+  targetUniversity?: string;
+  targetMajor?: string;
+  targetType?: string;
 }
 
 function DetailModal({ user, onClose }: { user: StoredUser; onClose: () => void }) {
@@ -34,15 +40,19 @@ function DetailModal({ user, onClose }: { user: StoredUser; onClose: () => void 
         </div>
         <div className="space-y-2.5">
           {[
-            ['ID', user.id],
+            ['ID', `#${user.id}`],
+            ['Telepon', user.phone || '-'],
+            ['Sekolah', user.school || '-'],
+            ['Target', user.targetUniversity ? `${user.targetUniversity}${user.targetMajor ? ' – ' + user.targetMajor : ''}` : '-'],
+            ['Jalur', user.targetType || '-'],
             ['Bergabung', user.joinDate ? new Date(user.joinDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'],
             ['Paket', user.hasPurchasedPackage ? (user.packageType || 'Aktif') : 'Belum Berlangganan'],
             ['Profil', user.profileCompleted ? 'Lengkap' : 'Belum Lengkap'],
             ['Role', user.role || 'user'],
           ].map(([label, value]) => (
-            <div key={label} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-              <span className="text-sm text-gray-500">{label}</span>
-              <span className="text-sm font-semibold text-gray-900">{value}</span>
+            <div key={label} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 gap-3">
+              <span className="text-sm text-gray-500 flex-shrink-0">{label}</span>
+              <span className="text-sm font-semibold text-gray-900 text-right">{value}</span>
             </div>
           ))}
         </div>
@@ -61,16 +71,45 @@ function DetailModal({ user, onClose }: { user: StoredUser; onClose: () => void 
 
 type FilterPkg = 'all' | 'active' | 'none';
 
+function mapUser(u: any): StoredUser {
+  return {
+    id: String(u.id),
+    name: u.name || '',
+    email: u.email || '',
+    role: u.role || 'user',
+    hasPurchasedPackage: u.hasPurchasedPackage || false,
+    packageType: u.packageType || undefined,
+    joinDate: u.joinDate || u.createdAt || undefined,
+    profileCompleted: u.profileCompleted || false,
+    phone: u.phone || undefined,
+    school: u.school || undefined,
+    targetUniversity: u.targetUniversity || undefined,
+    targetMajor: u.targetMajor || undefined,
+    targetType: u.targetType || undefined,
+  };
+}
+
 export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [filterPkg, setFilterPkg] = useState<FilterPkg>('all');
   const [detailUser, setDetailUser] = useState<StoredUser | null>(null);
+  const [users, setUsers] = useState<StoredUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const users: StoredUser[] = React.useMemo(() => {
-    const raw = localStorage.getItem('all_users');
-    if (!raw) return [];
-    return JSON.parse(raw).filter((u: StoredUser) => u.role !== 'admin');
+  const fetchUsers = React.useCallback(() => {
+    setLoading(true);
+    api.getAllUsers()
+      .then((data: any[]) => {
+        const mapped = data
+          .filter((u: any) => u.role !== 'admin')
+          .map(mapUser);
+        setUsers(mapped);
+      })
+      .catch(() => setUsers([]))
+      .finally(() => setLoading(false));
   }, []);
+
+  React.useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const filtered = users.filter(u => {
     const matchSearch = [u.name, u.email].some(v => v?.toLowerCase().includes(search.toLowerCase()));
@@ -79,11 +118,17 @@ export default function AdminUsers() {
   });
 
   const activeCount = users.filter(u => u.hasPurchasedPackage).length;
-  const freeCount   = users.filter(u => !u.hasPurchasedPackage).length;
+  const freeCount = users.filter(u => !u.hasPurchasedPackage).length;
   const completedProfile = users.filter(u => u.profileCompleted).length;
 
   return (
-    <AdminLayout title="👥 Manajemen Pengguna" subtitle="Lihat dan pantau semua pengguna terdaftar">
+    <AdminLayout title="👥 Manajemen Pengguna" subtitle="Lihat dan pantau semua pengguna terdaftar"
+      actions={
+        <button onClick={fetchUsers} disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      }>
       <AnimatePresence>
         {detailUser && <DetailModal user={detailUser} onClose={() => setDetailUser(null)} />}
       </AnimatePresence>
@@ -92,15 +137,17 @@ export default function AdminUsers() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Pengguna',    value: users.length,      icon: <Users className="w-5 h-5" />,       bg: 'bg-blue-50',   text: 'text-blue-600' },
-            { label: 'Berlangganan',      value: activeCount,       icon: <Package className="w-5 h-5" />,     bg: 'bg-green-50',  text: 'text-green-600' },
-            { label: 'Belum Berlangganan',value: freeCount,         icon: <User className="w-5 h-5" />,        bg: 'bg-yellow-50', text: 'text-yellow-600' },
-            { label: 'Profil Lengkap',    value: completedProfile,  icon: <ShieldCheck className="w-5 h-5" />, bg: 'bg-purple-50', text: 'text-purple-600' },
+            { label: 'Total Pengguna',     value: users.length,      icon: <Users className="w-5 h-5" />,       bg: 'bg-blue-50',   text: 'text-blue-600' },
+            { label: 'Berlangganan',       value: activeCount,       icon: <Package className="w-5 h-5" />,     bg: 'bg-green-50',  text: 'text-green-600' },
+            { label: 'Belum Berlangganan', value: freeCount,         icon: <User className="w-5 h-5" />,        bg: 'bg-yellow-50', text: 'text-yellow-600' },
+            { label: 'Profil Lengkap',     value: completedProfile,  icon: <ShieldCheck className="w-5 h-5" />, bg: 'bg-purple-50', text: 'text-purple-600' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-              <div className={`bg-white rounded-2xl p-5 border border-gray-100 shadow-sm`}>
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.text} mb-3`}>{s.icon}</div>
-                <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>
+                {loading
+                  ? <div className="h-8 w-12 bg-gray-100 animate-pulse rounded-lg mb-1" />
+                  : <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>}
                 <p className="text-xs text-gray-500 mt-0.5 font-medium">{s.label}</p>
               </div>
             </motion.div>
@@ -132,7 +179,15 @@ export default function AdminUsers() {
 
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {users.length === 0 ? (
+          {loading ? (
+            <div className="py-16 text-center text-gray-400">
+              <svg className="animate-spin w-8 h-8 mx-auto mb-2 text-[#2563EB]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              <p className="text-sm">Memuat pengguna...</p>
+            </div>
+          ) : users.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <Users className="w-8 h-8 mx-auto mb-2" />
               <p className="text-sm font-medium">Belum ada pengguna terdaftar</p>
@@ -202,7 +257,9 @@ export default function AdminUsers() {
             </>
           )}
         </div>
-        {users.length > 0 && <p className="text-xs text-gray-400 text-right">Menampilkan {filtered.length} dari {users.length} pengguna</p>}
+        {!loading && users.length > 0 && (
+          <p className="text-xs text-gray-400 text-right">Menampilkan {filtered.length} dari {users.length} pengguna</p>
+        )}
       </div>
     </AdminLayout>
   );
