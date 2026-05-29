@@ -115,6 +115,10 @@ export const api = {
       method: 'POST', body: JSON.stringify({ answers, subScores }),
     }),
 
+  // ── Packages ──────────────────────────────────────────────────────
+  getPackages: () => request('/packages'),
+  getPackage:  (id: string) => request(`/packages/${id}`),
+
   // ── Results ───────────────────────────────────────────────────────
   getResults:  () => request('/results'),
   getResult:   (tryoutId: string) => request(`/results/${tryoutId}`),

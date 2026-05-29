@@ -10,44 +10,40 @@ export function useResults() {
   const fetchResults = () => {
     const token = localStorage.getItem('access_token');
     if (!token) {
-      // Fallback ke localStorage jika belum login ke backend
-      const raw = localStorage.getItem('exam_results');
-      if (raw) {
-        try { setResults(JSON.parse(raw)); } catch {}
-      }
+      // Tidak login → bersihkan sisa data akun lain, tampilkan kosong
+      setResults([]);
+      localStorage.setItem('exam_results', '[]');
       return;
     }
 
     setLoading(true);
     api.getResults()
       .then((data: any[]) => {
-        if (data && data.length > 0) {
-          const mapped = data.map((r: any) => ({
-            tryOutId: r.tryoutId,
-            tryOutTitle: r.tryoutTitle,
-            category: r.category,
-            totalScore: r.totalScore,
-            percentage: parseFloat(r.percentage),
-            rank: r.rank,
-            totalParticipants: r.totalParticipants,
-            correct: r.correct,
-            wrong: r.wrong,
-            unanswered: r.unanswered,
-            totalQuestions: r.totalQuestions,
-            subScores: r.subScores || [],
-            date: r.completedAt,
-          }));
-          setResults(mapped);
-          // Update localStorage juga agar komponen lain bisa baca
-          localStorage.setItem('exam_results', JSON.stringify(mapped));
-        } else {
-          // Ambil dari localStorage sebagai fallback
-          const raw = localStorage.getItem('exam_results');
-          if (raw) { try { setResults(JSON.parse(raw)); } catch {} }
-        }
+        // FIX A3: SELALU timpa localStorage dengan data dari backend,
+        // termasuk saat array kosong [] — mencegah kebocoran data antar akun.
+        const mapped = Array.isArray(data)
+          ? data.map((r: any) => ({
+              tryOutId: String(r.tryoutId),
+              tryOutTitle: r.tryoutTitle || 'Try Out',
+              category: r.category,
+              totalScore: Number(r.totalScore),
+              percentage: parseFloat(r.percentage),
+              rank: r.rank,
+              totalParticipants: r.totalParticipants,
+              correct: r.correct,
+              wrong: r.wrong,
+              unanswered: r.unanswered,
+              totalQuestions: r.totalQuestions,
+              subScores: r.subScores || [],
+              date: r.completedAt,
+            }))
+          : [];
+        setResults(mapped);
+        // Override localStorage — data akun ini, bukan akun lain
+        localStorage.setItem('exam_results', JSON.stringify(mapped));
       })
       .catch(() => {
-        // Fallback ke localStorage
+        // Network error saja yang fallback ke cache — bukan data kosong
         const raw = localStorage.getItem('exam_results');
         if (raw) { try { setResults(JSON.parse(raw)); } catch {} }
       })
@@ -73,12 +69,11 @@ export function useExamSubmit() {
     try {
       const token = localStorage.getItem('access_token');
       if (token) {
-        // Kirim ke backend
         const result = await api.submitExam(tryoutId, answers, subScores);
         return result;
       }
     } catch (err) {
-      console.error('Submit ke backend gagal, simpan ke localStorage:', err);
+      console.error('Submit ke backend gagal:', err);
     } finally {
       setSubmitting(false);
     }

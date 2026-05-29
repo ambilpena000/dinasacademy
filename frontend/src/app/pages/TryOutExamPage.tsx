@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Clock, Flag, ChevronLeft, ChevronRight, X,
-  AlertTriangle, CheckCircle, Save
+  AlertTriangle, CheckCircle, Save, Loader2
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
-import { mockTryOuts, mockQuestions } from '../data/mockData';
 import { api } from '../lib/api';
 
 // ── Subtes SNBT 2026 (urutan & durasi sesuai regulasi) ────────────
@@ -28,9 +27,9 @@ const SKD_SUBTESTS = [
 ];
 
 const STIS_SUBTESTS = [
-  { code: 'MTK', name: 'Matematika',         duration: 60, totalQ: 50 },
-  { code: 'ENG', name: 'Bahasa Inggris',     duration: 40, totalQ: 30 },
-  { code: 'PU',  name: 'Pengetahuan Umum',  duration: 20, totalQ: 20 },
+  { code: 'MTK', name: 'Matematika',        duration: 60, totalQ: 50 },
+  { code: 'ENG', name: 'Bahasa Inggris',    duration: 40, totalQ: 30 },
+  { code: 'PU',  name: 'Pengetahuan Umum', duration: 20, totalQ: 20 },
 ];
 
 type SubtestCfg = { code: string; name: string; duration: number; totalQ: number };
@@ -90,11 +89,53 @@ function SubtestTransitionModal({ current, next, onContinue }: {
 export default function TryOutExamPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const tryOut = mockTryOuts.find(t => t.id === id);
+
+  // FIX A2: State untuk tryout dan questions dari backend
+  const [tryOut, setTryOut] = useState<any>(null);
+  const [backendQuestions, setBackendQuestions] = useState<any[]>([]);
+  const [loadingTryout, setLoadingTryout] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // FIX A2: Fetch tryout & questions dari backend saat mount
+  useEffect(() => {
+    if (!id) return;
+    setLoadingTryout(true);
+    setLoadError(null);
+
+    Promise.all([
+      api.getTryout(id),
+      api.getQuestions(id),
+    ])
+      .then(([tryoutData, questionsData]) => {
+        setTryOut(tryoutData);
+        // Map pertanyaan dari format backend ke format yang dipakai exam page
+        const mapped = Array.isArray(questionsData) ? questionsData.map((q: any) => ({
+          id: q.id,
+          questionText: q.questionText,
+          subjectCode: (q.subtestCode || '').toUpperCase(),
+          subjectName: q.subtestName || q.subtestCode,
+          options: [
+            { id: 'a', text: q.optionA },
+            { id: 'b', text: q.optionB },
+            { id: 'c', text: q.optionC },
+            { id: 'd', text: q.optionD },
+            ...(q.optionE ? [{ id: 'e', text: q.optionE }] : []),
+          ],
+          correctAnswer: (q.correctAnswer || '').toLowerCase(),
+          explanation: q.explanation || '',
+        })) : [];
+        setBackendQuestions(mapped);
+      })
+      .catch((err) => {
+        console.error('Gagal load tryout/questions:', err);
+        setLoadError(err.message || 'Gagal memuat data try out');
+      })
+      .finally(() => setLoadingTryout(false));
+  }, [id]);
 
   const subtests: SubtestCfg[] = React.useMemo(() => {
     if (!tryOut) return [];
-    if (tryOut.category === 'PTN') return SNBT_SUBTESTS;
+    if (tryOut.category === 'PTN' || tryOut.category === 'SNBT') return SNBT_SUBTESTS;
     if (tryOut.category === 'SKD') return SKD_SUBTESTS;
     return STIS_SUBTESTS;
   }, [tryOut]);
@@ -116,6 +157,7 @@ export default function TryOutExamPage() {
   const [showFinish, setShowFinish] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -128,17 +170,34 @@ export default function TryOutExamPage() {
     return subtests.map(sub => { const r = { start: s, end: s + sub.totalQ - 1 }; s += sub.totalQ; return r; });
   }, [subtests]);
 
-  // ── Build all questions ───────────────────────────────────────
+  // FIX A2: Gunakan pertanyaan dari backend, bukan mockQuestions
   const allQuestions = React.useMemo(() => {
-    if (!subtests.length) return [];
+    if (!subtests.length || !backendQuestions.length) return [];
     return subtests.flatMap(sub => {
-      const pool = mockQuestions.filter(q => q.subjectCode === sub.code);
+      // Cari soal dari backend untuk subtes ini
+      const pool = backendQuestions.filter(q => q.subjectCode === sub.code);
       return Array(sub.totalQ).fill(null).map((_, i) => {
-        const base = pool.length > 0 ? pool[i % pool.length] : mockQuestions[i % mockQuestions.length];
-        return { ...base, subjectCode: sub.code, subjectName: sub.name };
+        if (pool.length > 0) {
+          return { ...pool[i % pool.length], subjectCode: sub.code, subjectName: sub.name };
+        }
+        // Fallback: soal placeholder jika backend belum punya soal untuk subtes ini
+        return {
+          id: `placeholder-${sub.code}-${i}`,
+          questionText: `[Soal ${sub.code} nomor ${i + 1} belum tersedia]`,
+          subjectCode: sub.code,
+          subjectName: sub.name,
+          options: [
+            { id: 'a', text: 'Pilihan A' },
+            { id: 'b', text: 'Pilihan B' },
+            { id: 'c', text: 'Pilihan C' },
+            { id: 'd', text: 'Pilihan D' },
+          ],
+          correctAnswer: 'a',
+          explanation: '',
+        };
       });
     });
-  }, [subtests]);
+  }, [subtests, backendQuestions]);
 
   const currentRange = subtestRanges[currentSubtestIdx] || { start: 0, end: 0 };
   const subtestQs = allQuestions.slice(currentRange.start, currentRange.end + 1);
@@ -156,7 +215,6 @@ export default function TryOutExamPage() {
     setSubtestTimer(initialTime);
     setCurrentQuestion(0);
 
-    // Start countdown immediately with initialTime (tidak tunggu state update)
     if (timerRef.current) clearInterval(timerRef.current);
     let remaining = initialTime;
     timerRef.current = setInterval(() => {
@@ -165,9 +223,8 @@ export default function TryOutExamPage() {
       if (remaining <= 0) {
         clearInterval(timerRef.current!);
         timerRef.current = null;
-        // Trigger next subtest via state — pakai setTimeout agar tidak conflict dengan render
         setTimeout(() => {
-          setCurrentSubtestIdx((prev : number) => {
+          setCurrentSubtestIdx((prev: number) => {
             if (prev < subtests.length - 1) {
               setShowTransition(true);
             } else {
@@ -191,7 +248,6 @@ export default function TryOutExamPage() {
   const saveProgress = useCallback(() => {
     if (!id) return;
     localStorage.setItem(getSaveKey(id), JSON.stringify({ answers, currentSubtestIdx, savedAt: new Date().toISOString() }));
-    // Sinkron draft ke backend
     const token = localStorage.getItem('access_token');
     if (token && id) {
       api.saveDraft(id, answers, currentSubtestIdx).catch(() => {});
@@ -199,13 +255,11 @@ export default function TryOutExamPage() {
     setLastSaved(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
   }, [id, answers, currentSubtestIdx]);
 
-  // Debounced save on answer change
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(saveProgress, 2000);
   }, [answers, saveProgress]);
 
-  // Periodic save every 30s
   useEffect(() => {
     const t = setInterval(saveProgress, 30000);
     return () => clearInterval(t);
@@ -230,38 +284,81 @@ export default function TryOutExamPage() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
-  // ── Finish ────────────────────────────────────────────────────
-  const confirmFinish = () => {
+  // ── Finish: kirim ke backend ───────────────────────────────────
+  const confirmFinish = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const totalQ = allQuestions.length;
-    const correct = allQuestions.filter((q, i) => answers[i] === q.correctAnswer).length;
+
+    // Buat subScores untuk dikirim ke backend
     const subScores = subtests.map((sub, si) => {
       const r = subtestRanges[si];
       const sQs = allQuestions.slice(r.start, r.end + 1);
       const sCorrect = sQs.filter((q, qi) => answers[r.start + qi] === q.correctAnswer).length;
-      const maxS = sub.code === 'TKP' ? 225 : sub.code === 'TIU' ? 175 : 150;
-      return { subject: sub.name, code: sub.code, score: Math.floor((sCorrect / sQs.length) * maxS), maxScore: maxS, correctCount: sCorrect, totalCount: sQs.length };
+      return {
+        subject: sub.name,
+        code: sub.code,
+        correctCount: sCorrect,
+        totalCount: sQs.length,
+      };
     });
+
+    // FIX A2: Konversi answers dari index-based ke questionId-based untuk backend
+    const backendAnswers: Record<string, string> = {};
+    allQuestions.forEach((q, idx) => {
+      if (answers[idx] && q.id && !String(q.id).startsWith('placeholder')) {
+        backendAnswers[String(q.id)] = answers[idx];
+      }
+    });
+
+    let backendResult: any = null;
+    try {
+      const token = localStorage.getItem('access_token');
+      if (token && id) {
+        // Backend hitung skor yang benar (termasuk TKP dengan bobot per soal)
+        backendResult = await api.submitExam(id, backendAnswers, subScores);
+      }
+    } catch (err) {
+      console.error('Submit backend gagal, lanjut ke hasil lokal:', err);
+    }
+
+    // Simpan hasil — gunakan skor dari backend jika tersedia
+    // correctAnswer tidak dikirim saat ujian (security), jadi hanya hitung yang dijawab
+    const answeredCount = Object.keys(backendAnswers).length;
     const result = {
-      tryOutId: id, tryOutTitle: tryOut?.title || '', category: tryOut?.category || 'PTN',
-      answers, correct, wrong: Object.keys(answers).length - correct,
-      unanswered: totalQ - Object.keys(answers).length,
-      totalQuestions: totalQ, totalScore: Math.round((correct / totalQ) * 1000),
-      maxScore: 1000, percentage: Math.round((correct / totalQ) * 100),
-      rank: Math.floor(Math.random() * 200) + 50,
-      totalParticipants: Math.floor(Math.random() * 2000) + 1000,
-      date: new Date().toISOString(), subScores,
+      tryOutId: id,
+      tryOutTitle: tryOut?.title || 'Try Out',
+      category: tryOut?.category || 'PTN',
+      answers,
+      correct:        backendResult?.correct        ?? 0,
+      wrong:          backendResult?.wrong          ?? 0,
+      unanswered:     backendResult?.unanswered     ?? (totalQ - answeredCount),
+      totalQuestions: backendResult?.totalQuestions ?? totalQ,
+      totalScore:     backendResult?.totalScore     ?? 0,
+      maxScore:       backendResult?.maxScore       ?? (tryOut?.category === 'SKD' ? 550 : 1000),
+      percentage:     backendResult?.percentage     ?? 0,
+      date: new Date().toISOString(),
+      subScores:      backendResult?.subScores      ?? subScores,
     };
     const existing = JSON.parse(localStorage.getItem('exam_results') || '[]');
     localStorage.setItem('exam_results', JSON.stringify([result, ...existing.filter((r: any) => r.tryOutId !== id)]));
+
     const completed = JSON.parse(localStorage.getItem('completed_tryouts') || '[]');
     if (!completed.includes(id)) localStorage.setItem('completed_tryouts', JSON.stringify([...completed, id]));
+
     const today = new Date().toDateString();
     const sd = JSON.parse(localStorage.getItem('streak_data') || '{"streak":0,"lastDate":""}');
     if (sd.lastDate !== today) {
       const yd = new Date(); yd.setDate(yd.getDate() - 1);
-      localStorage.setItem('streak_data', JSON.stringify({ streak: sd.lastDate === yd.toDateString() ? sd.streak + 1 : 1, lastDate: today }));
+      localStorage.setItem('streak_data', JSON.stringify({
+        streak: sd.lastDate === yd.toDateString() ? sd.streak + 1 : 1,
+        lastDate: today,
+      }));
     }
+
     if (id) localStorage.removeItem(getSaveKey(id));
+    setIsSubmitting(false);
     navigate(`/tryout/${id}/pembahasan`);
   };
 
@@ -270,7 +367,40 @@ export default function TryOutExamPage() {
   const totalAnswered = Object.keys(answers).length;
   const totalQ = allQuestions.length;
 
-  if (!tryOut || !subtests.length) return <div className="p-8 text-center text-gray-500">Try out tidak ditemukan</div>;
+  // ── Loading & Error states ────────────────────────────────────
+  if (loadingTryout) {
+    return (
+      <div className="fixed inset-0 bg-[#F9FAFB] z-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-[#2563EB] animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Memuat soal ujian...</p>
+          <p className="text-sm text-gray-400 mt-1">Mohon tunggu sebentar</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="fixed inset-0 bg-[#F9FAFB] z-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Gagal Memuat Try Out</h2>
+          <p className="text-gray-500 mb-6 text-sm">{loadError}</p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="ghost" onClick={() => navigate(-1)}>Kembali</Button>
+            <Button variant="primary" onClick={() => window.location.reload()}>Coba Lagi</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tryOut || !subtests.length) {
+    return <div className="p-8 text-center text-gray-500">Try out tidak ditemukan</div>;
+  }
 
   return (
     <div className="fixed inset-0 bg-[#F9FAFB] z-50 flex flex-col">
@@ -286,7 +416,6 @@ export default function TryOutExamPage() {
             <p className="text-xs text-gray-400 hidden md:block truncate">{tryOut.title}</p>
             <p className="text-sm font-bold text-gray-900 truncate">{currentSubtest?.name}</p>
           </div>
-          {/* Subtest pills */}
           <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
             {subtests.map((sub, i) => (
               <span key={sub.code} className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
@@ -303,14 +432,12 @@ export default function TryOutExamPage() {
               <Save className="w-3 h-3" /><span>Tersimpan {lastSaved}</span>
             </div>
           )}
-          {/* Timer */}
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-mono font-bold flex-shrink-0 ${
             subtestTimer < 120 ? 'bg-red-100 text-red-700 animate-pulse' :
             subtestTimer < 300 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
           }`}>
             <Clock className="w-4 h-4" />{formatTime(subtestTimer)}
           </div>
-          {/* Total progress */}
           <div className="hidden md:flex text-xs bg-gray-100 px-2.5 py-1.5 rounded-lg text-gray-500 flex-shrink-0">
             <span className="font-bold text-gray-700">{totalAnswered}</span>/{totalQ}
           </div>
@@ -485,7 +612,7 @@ export default function TryOutExamPage() {
         {showFinish && (
           <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setShowFinish(false)}>
+            onClick={() => !isSubmitting && setShowFinish(false)}>
             <motion.div className="bg-white rounded-2xl p-6 max-w-md w-full"
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()}>
@@ -497,7 +624,6 @@ export default function TryOutExamPage() {
                 <p className="text-sm text-gray-500">Jawaban tidak bisa diubah setelah dikumpulkan</p>
               </div>
 
-              {/* Summary per subtes */}
               <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
                 {subtests.map((sub, si) => {
                   const r = subtestRanges[si];
@@ -527,10 +653,14 @@ export default function TryOutExamPage() {
               )}
 
               <div className="space-y-2">
-                <Button variant="primary" className="w-full" onClick={confirmFinish}>
-                  <CheckCircle className="w-4 h-4 mr-2" /> Ya, Kumpulkan Jawaban
+                <Button variant="primary" className="w-full" onClick={confirmFinish} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mengirim Jawaban...</>
+                  ) : (
+                    <><CheckCircle className="w-4 h-4 mr-2" /> Ya, Kumpulkan Jawaban</>
+                  )}
                 </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setShowFinish(false)}>
+                <Button variant="ghost" className="w-full" onClick={() => setShowFinish(false)} disabled={isSubmitting}>
                   Kembali Periksa
                 </Button>
               </div>

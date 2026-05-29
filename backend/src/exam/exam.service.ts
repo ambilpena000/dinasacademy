@@ -163,19 +163,30 @@ export class ExamService {
 
         if (!userAns) {
           unanswered++;
+        } else if (isSKD && subtest === 'TKP') {
+          // FIX B2 TKP: tidak ada konsep benar/salah — semua opsi yang dipilih
+          // langsung menghasilkan skor sesuai bobotnya (a=5 b=4 c=3 d=2 e=1 default).
+          // Jika soal punya optionWeights (JSON field), gunakan itu;
+          // jika tidak, fallback ke TKP_OPTION_SCORES posisional.
+          const weights = q.optionWeights
+            ? (typeof q.optionWeights === 'string' ? JSON.parse(q.optionWeights) : q.optionWeights)
+            : TKP_OPTION_SCORES;
+          const score = weights[userAns] ?? TKP_OPTION_SCORES[userAns] ?? 3;
+          rawScore += score;
+          // Untuk TKP semua jawaban dianggap "benar" (ada nilainya)
+          correct++;
+        } else if (!userAns) {
+          // sudah ditangani di atas
         } else if (userAns === correct_ans) {
           correct++;
-          if (isSKD && subtest === 'TKP') {
-            // TKP: skor berdasarkan posisi opsi yang dipilih
-            rawScore += TKP_OPTION_SCORES[userAns] ?? 3;
-          } else if (isSKD) {
+          if (isSKD) {
             rawScore += 5; // TWK/TIU: +5 benar
           } else {
             rawScore += 1; // SNBT/PTN: +1 benar
           }
         } else {
           wrong++;
-          // SKD & SNBT tidak ada pengurangan untuk jawaban salah
+          // TWK/TIU/SNBT: tidak ada pengurangan untuk jawaban salah
         }
       }
 
@@ -222,9 +233,11 @@ export class ExamService {
       totalScore = subScores.reduce((s, ss) => s + ss.scaledScore, 0);
       maxScore   = 550; // max resmi SKD (175 TWK + 175 TIU + 175 TKP + 25 bonus)
     } else {
-      // SNBT: rata-rata scaled, atau sum tergantung soal
-      totalScore = subScores.reduce((s, ss) => s + ss.scaledScore, 0);
-      maxScore   = subScores.length > 0 ? subScores.length * 1000 : 1000;
+      // FIX B2: SNBT — totalScore = rata-rata scaledScore semua subtes (bukan sum)
+      // Sehingga totalScore max = 1000, bukan 7000 (7 subtes x 1000)
+      const totalRaw = subScores.reduce((s, ss) => s + ss.scaledScore, 0);
+      totalScore = subScores.length > 0 ? Math.round(totalRaw / subScores.length) : 0;
+      maxScore   = 1000;
     }
 
     const percentage = totalQuestions > 0

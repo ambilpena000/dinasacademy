@@ -44,6 +44,12 @@ export class Question {
   @Column('text', { nullable: true })
   tips?: string;
 
+  // FIX B2 TKP: bobot per opsi untuk soal TKP
+  // Format JSON: { "a": 5, "b": 3, "c": 2, "d": 4, "e": 1 }
+  // Null = gunakan default posisional (a=5 b=4 c=3 d=2 e=1)
+  @Column('jsonb', { nullable: true })
+  optionWeights?: Record<string, number>;
+
   @Column()
   orderIndex!: number;
 

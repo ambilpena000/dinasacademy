@@ -13,7 +13,7 @@ export class ExamResult {
   @Column()
   tryoutId!: number;
 
-  @Column()
+  @Column({ nullable: true })
   tryoutTitle!: string;
 
   @Column()

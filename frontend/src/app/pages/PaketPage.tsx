@@ -12,8 +12,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Input } from '../components/Input';
-import { mockPackages } from '../data/mockData';
 import { Footer } from '../components/Footer';
+import { api } from '../lib/api';
 
 export default function PaketPage() {
   const { user, purchasePackage, addOrder, refreshUser } = useAuth();
@@ -23,16 +23,58 @@ export default function PaketPage() {
   
   const [selectedCategory, setSelectedCategory] = useState<'SNBT' | 'SEKDIN' | 'COMBO'>('SNBT');
   const [checkoutMode, setCheckoutMode] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState(mockPackages[0]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'ewallet'>('transfer');
   const [orderSubmitted, setOrderSubmitted] = useState(false);
 
-  // Handle package selection from URL parameter
+  // FIX A2: Fetch packages dari backend saat komponen mount
   useEffect(() => {
-    if (packageIdFromUrl) {
-      const pkg = mockPackages.find(p => p.id === packageIdFromUrl);
+    setPackagesLoading(true);
+    api.getPackages()
+      .then((data: any[]) => {
+        // Map format backend → format yang dipakai komponen
+        const mapped = data.map((p: any) => ({
+          id:              String(p.id),
+          name:            p.name,
+          track:           p.track,
+          type:            p.type || p.track,
+          price:           Number(p.price),
+          duration:        typeof p.duration === 'number'
+            ? (p.duration >= 360 ? '12 bulan' : p.duration >= 170 ? '6 bulan' : p.duration >= 80 ? '3 bulan' : `${p.duration} hari`)
+            : (typeof p.duration === 'string' ? p.duration : '12 bulan'),
+          description:     p.description,
+          features:        Array.isArray(p.features) ? p.features : [],
+          includedTryOuts: Array.isArray(p.includedTryouts)
+            ? p.includedTryouts.length
+            : (typeof p.includedTryOuts === 'number' ? p.includedTryOuts : 0),
+          isPopular:       false, // backend belum punya field ini; set manual jika perlu
+        }));
+        // Tandai paket pertama per kategori sebagai popular
+        ['PTN', 'Sekdin'].forEach(track => {
+          const first = mapped.find((p: any) => p.track === track);
+          if (first) first.isPopular = true;
+        });
+        setPackages(mapped);
+        if (mapped.length > 0) setSelectedPackage(mapped[0]);
+      })
+      .catch(() => {
+        // Fallback: gunakan mock data jika backend belum tersedia
+        import('../data/mockData').then(({ mockPackages }) => {
+          setPackages(mockPackages as any[]);
+          setSelectedPackage(mockPackages[0] as any);
+        });
+      })
+      .finally(() => setPackagesLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle package selection from URL parameter — jalankan setelah packages dimuat
+  useEffect(() => {
+    if (packageIdFromUrl && packages.length > 0) {
+      const pkg = packages.find((p: any) => p.id === packageIdFromUrl);
       if (pkg) {
-        // Determine category based on package
         if (pkg.name.includes('Combo')) {
           setSelectedCategory('COMBO');
         } else if (pkg.track === 'PTN') {
@@ -41,7 +83,6 @@ export default function PaketPage() {
           setSelectedCategory('SEKDIN');
         }
         setSelectedPackage(pkg);
-        // Auto-scroll to the package
         setTimeout(() => {
           const element = document.getElementById(`package-${packageIdFromUrl}`);
           if (element) {
@@ -50,16 +91,16 @@ export default function PaketPage() {
         }, 300);
       }
     }
-  }, [packageIdFromUrl]);
+  }, [packageIdFromUrl, packages]);
 
-  // Filter packages based on category
+  // FIX A2: Filter menggunakan packages dari backend (bukan mockPackages)
   const getFilteredPackages = () => {
     if (selectedCategory === 'COMBO') {
-      return mockPackages.filter(p => p.name.includes('Combo'));
+      return packages.filter((p: any) => p.name.includes('Combo'));
     } else if (selectedCategory === 'SNBT') {
-      return mockPackages.filter(p => p.track === 'PTN');
+      return packages.filter((p: any) => p.track === 'PTN');
     } else {
-      return mockPackages.filter(p => p.track === 'Sekdin');
+      return packages.filter((p: any) => p.track === 'Sekdin');
     }
   };
 
@@ -78,7 +119,7 @@ export default function PaketPage() {
     return false;
   };
 
-  const handleSelectPackage = (pkg: typeof mockPackages[0]) => {
+  const handleSelectPackage = (pkg: any) => {
     if (isPackageSubscribed(pkg.name)) return;
     setSelectedPackage(pkg);
     setCheckoutMode(true);
@@ -173,6 +214,20 @@ export default function PaketPage() {
     waOpenedRef.current = true;
   };
 
+
+  // FIX A2: Tampilkan loading saat packages masih di-fetch dari backend
+  if (packagesLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 font-medium">Memuat paket...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedPackage) return null;
 
   // If in checkout mode, show checkout view
   if (checkoutMode) {

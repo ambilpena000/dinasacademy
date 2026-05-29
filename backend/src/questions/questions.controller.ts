@@ -15,8 +15,11 @@ export class QuestionsController {
   // GET /questions/tryout/:tryoutId — soal per tryout (untuk exam, tanpa paginasi)
   @Get('tryout/:tryoutId')
   @UseGuards(JwtAuthGuard)
-  findByTryout(@Param('tryoutId') tryoutId: string) {
-    return this.questionsService.findAllByTryout(parseInt(tryoutId));
+  async findByTryout(@Param('tryoutId') tryoutId: string) {
+    const questions = await this.questionsService.findAllByTryout(parseInt(tryoutId));
+    // Keamanan: strip correctAnswer & explanation agar user tidak bisa curang saat ujian.
+    // optionWeights TETAP dikirim karena dibutuhkan untuk tampilan soal TKP di frontend.
+    return questions.map(({ correctAnswer: _c, explanation: _e, ...rest }) => rest);
   }
 
   // POST /questions/upload — import JSON atau PDF (admin only)
