@@ -29,4 +29,9 @@ export class ResultsService {
     const result = this.resultRepo.create(data);
     return this.resultRepo.save(result);
   }
+
+  // FIX B8: update rank setelah skor semua peserta diketahui
+  async updateRank(resultId: number, rank: number, totalParticipants: number) {
+    await this.resultRepo.update(resultId, { rank, totalParticipants });
+  }
 }

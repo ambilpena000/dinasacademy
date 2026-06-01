@@ -22,6 +22,14 @@ export class QuestionsController {
     return questions.map(({ correctAnswer: _c, explanation: _e, ...rest }) => rest);
   }
 
+  // FIX B1: endpoint pembahasan — include correctAnswer + explanation setelah ujian selesai
+  @Get('tryout/:tryoutId/pembahasan')
+  @UseGuards(JwtAuthGuard)
+  findByTryoutWithAnswers(@Param('tryoutId') tryoutId: string) {
+    // correctAnswer dan explanation dikirim untuk halaman pembahasan
+    return this.questionsService.findAllByTryout(parseInt(tryoutId));
+  }
+
   // POST /questions/upload — import JSON atau PDF (admin only)
   @Post('upload')
   @UseGuards(JwtAuthGuard)

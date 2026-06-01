@@ -150,15 +150,11 @@ export default function ProfilePage() {
     });
   };
 
+  // FIX B6: ambil tanggal bergabung dari user.createdAt (dari backend via getMe)
+  // localStorage key 'all_users' tidak pernah diisi oleh kode manapun
   const joinDate = React.useMemo(() => {
-    const raw = localStorage.getItem('all_users');
-    if (raw) {
-      const users = JSON.parse(raw);
-      const found = users.find((u: any) => u.email === user?.email);
-      if (found?.joinDate) return found.joinDate;
-    }
-    return user?.joinDate || new Date().toISOString().split('T')[0];
-  }, [user?.email]);
+    return (user as any)?.createdAt || user?.joinDate || new Date().toISOString().split('T')[0];
+  }, [user]);
 
   const streakData = React.useMemo(() => {
     const raw = localStorage.getItem('streak_data');

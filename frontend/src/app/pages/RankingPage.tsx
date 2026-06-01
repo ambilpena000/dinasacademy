@@ -1,73 +1,17 @@
 import { api } from '../lib/api';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { motion } from 'motion/react';
-import { ArrowLeft, Trophy, Medal, Crown, User } from 'lucide-react';
-import { mockTryOuts } from '../data/mockData';
+import { ArrowLeft, Trophy, Medal, Crown, User, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-// Generate mock leaderboard data berdasarkan tryout ID
-function generateLeaderboard(tryOutId: string, userRank: number, userScore: number, userName: string) {
-  const seed = tryOutId.charCodeAt(0) + tryOutId.charCodeAt(tryOutId.length - 1);
-  const totalParticipants = 800 + (seed % 1200);
+// FIX B2: Tidak ada mock data, tidak ada generateLeaderboard fiktif
 
-  const entries: { rank: number; name: string; score: number; isUser: boolean }[] = [];
-
-  const names = [
-    'Andi Saputra', 'Budi Hartono', 'Citra Dewi', 'Dani Pratama',
-    'Eka Putri', 'Fajar Nugroho', 'Gita Sari', 'Hendra Wijaya',
-    'Indah Lestari', 'Joko Susilo', 'Kiki Amelia', 'Lina Marlina',
-    'Made Surya', 'Nanda Kusuma', 'Oki Firmansyah', 'Putri Rahayu',
-    'Rahmat Hidayat', 'Sari Wulandari', 'Tono Santoso', 'Umar Hakim',
-    'Vina Anggraini', 'Wahyu Setiawan', 'Xena Pertiwi', 'Yudi Kurniawan',
-    'Zara Nabilah', 'Arif Budiman', 'Bayu Prakoso', 'Clara Novita',
-    'Dewa Asmara', 'Erni Susanti',
-  ];
-
-  // Top 3
-  const topScores = [
-    userRank === 1 ? userScore : Math.max(userScore + 150 + (seed % 100), 900),
-    userRank === 2 ? userScore : Math.max(userScore + 100 + (seed % 80), 860),
-    userRank === 3 ? userScore : Math.max(userScore + 50 + (seed % 60), 820),
-  ];
-
-  for (let i = 0; i < 3; i++) {
-    if (i + 1 === userRank) {
-      entries.push({ rank: i + 1, name: userName, score: userScore, isUser: true });
-    } else {
-      entries.push({ rank: i + 1, name: names[i], score: topScores[i], isUser: false });
-    }
-  }
-
-  // Sekitar user rank (jika user bukan top 3)
-  if (userRank > 3) {
-    const startRank = Math.max(4, userRank - 3);
-    const endRank = Math.min(userRank + 3, totalParticipants);
-
-    for (let r = startRank; r <= endRank; r++) {
-      if (r === userRank) {
-        entries.push({ rank: r, name: userName, score: userScore, isUser: true });
-      } else {
-        const nameIdx = (r + seed) % names.length;
-        const diff = r - userRank;
-        const score = Math.max(0, userScore - diff * 12 + (seed % 10));
-        entries.push({ rank: r, name: names[nameIdx], score: Math.min(1000, score), isUser: false });
-      }
-    }
-  }
-
-  // Urutkan dan deduplicate
-  const unique = [...new Map(entries.map(e => [e.rank, e])).values()];
-  unique.sort((a, b) => a.rank - b.rank);
-
-  return { entries: unique, totalParticipants };
-}
-
-const rankBadge = (rank: number) => {
+const rankBadge = (rank: number, isUser: boolean) => {
   if (rank === 1) return <Crown className="w-5 h-5 text-yellow-500" />;
   if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />;
   if (rank === 3) return <Medal className="w-5 h-5 text-amber-600" />;
-  return <span className="text-sm font-bold text-gray-400 w-5 text-center">{rank}</span>;
+  return <span className={`text-sm font-bold w-5 text-center ${isUser ? 'text-[#2563EB]' : 'text-gray-400'}`}>{rank}</span>;
 };
 
 const rankRowStyle = (rank: number, isUser: boolean) => {
@@ -82,85 +26,139 @@ export default function RankingPage() {
   const { id } = useParams();
   const { user } = useAuth();
 
-  // Fetch ranking dari backend (optional)
-  useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (id && token) {
-      api.getRanking(id).catch(() => {});
-    }
-  }, [id]);
+  const [entries, setEntries] = useState<any[]>([]);
+  const [tryOutTitle, setTryOutTitle] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const tryOut = mockTryOuts.find(t => t.id === id);
-
-  // Ambil hasil try out user dari localStorage
+  // Ambil hasil user dari localStorage untuk highlight baris user
   const examResult = React.useMemo(() => {
     const raw = localStorage.getItem('exam_results');
     if (!raw) return null;
-    const results = JSON.parse(raw);
-    return results.find((r: any) => r.tryOutId === id) || null;
+    try {
+      const results = JSON.parse(raw);
+      return results.find((r: any) => String(r.tryOutId) === String(id)) || null;
+    } catch { return null; }
   }, [id]);
 
-  const userRank = examResult?.rank || 99;
-  const userScore = examResult?.totalScore || 0;
-  const userName = user?.name || 'Kamu';
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
 
-  const { entries, totalParticipants } = React.useMemo(
-    () => generateLeaderboard(id || '1', userRank, userScore, userName),
-    [id, userRank, userScore, userName]
-  );
+    Promise.all([
+      api.getTryout(id),
+      api.getRanking(id),
+    ])
+      .then(([tryout, rankingData]) => {
+        setTryOutTitle(tryout?.title || 'Try Out');
+
+        // Backend mengembalikan array hasil, kita urutkan dan beri nomor rank
+        const sorted = Array.isArray(rankingData)
+          ? [...rankingData].sort((a: any, b: any) => b.totalScore - a.totalScore)
+          : [];
+
+        const withRank = sorted.map((r: any, i: number) => ({
+          rank: i + 1,
+          userId: r.userId,
+          // Anonimkan nama: tampilkan "Kamu" jika userId milik user saat ini
+          name: r.userId === user?.id ? (user?.name || 'Kamu') : anonimize(r.userId, i),
+          score: Math.round(Number(r.totalScore)),
+          isUser: String(r.userId) === String(user?.id),
+        }));
+
+        setEntries(withRank);
+      })
+      .catch(err => setError(err.message || 'Gagal memuat ranking'))
+      .finally(() => setLoading(false));
+  }, [id, user?.id]);
+
+  // Anonimkan nama peserta lain untuk privasi
+  const anonimize = (userId: number, index: number) => {
+    const names = ['Peserta A','Peserta B','Peserta C','Peserta D','Peserta E',
+      'Peserta F','Peserta G','Peserta H','Peserta I','Peserta J'];
+    return names[index % names.length];
+  };
 
   const userEntry = entries.find(e => e.isUser);
   const top3 = entries.filter(e => e.rank <= 3);
   const others = entries.filter(e => e.rank > 3);
-  const showSeparator = others.length > 0 && top3.length > 0 && others[0].rank > 4;
+  // Jika user tidak di top 3 dan tidak di 4 entri pertama, tambahkan spacer
+  const userInOthers = others.find(e => e.isUser);
+  const showSeparator = userEntry && userEntry.rank > 4 &&
+    others.length > 0 && others[0].rank > 4;
 
-  if (!tryOut) {
+  if (loading) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Try out tidak ditemukan</p>
-        <Link to="/hasil" className="text-[#2563EB] text-sm font-semibold mt-2 block">← Kembali ke Hasil</Link>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Memuat ranking...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <p className="text-gray-500">{error}</p>
+        <Link to="/hasil">
+          <button className="px-4 py-2 bg-[#2563EB] text-white text-sm font-semibold rounded-xl">
+            Kembali ke Hasil
+          </button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <Trophy className="w-12 h-12 text-gray-300 mx-auto" />
+        <p className="text-gray-500 font-medium">Belum ada peserta yang menyelesaikan try out ini</p>
+        <Link to="/hasil">
+          <button className="px-4 py-2 text-[#2563EB] text-sm font-semibold hover:underline">
+            ← Kembali ke Hasil
+          </button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-6 pb-8">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <Link to="/hasil" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Kembali ke Hasil
-        </Link>
-
-        <div className="bg-[#2563EB] rounded-2xl p-6 text-white relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5" />
-          <div className="absolute right-8 -bottom-4 w-24 h-24 rounded-full bg-white/5" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <Trophy className="w-5 h-5 text-yellow-300" />
-              <p className="text-blue-100 text-sm font-medium">Papan Peringkat</p>
-            </div>
-            <h1 className="text-xl font-bold mb-1">{tryOut.title}</h1>
-            <p className="text-blue-200 text-sm">{totalParticipants.toLocaleString('id-ID')} peserta</p>
-          </div>
+        <div className="flex items-center gap-3 mb-1">
+          <Link to="/hasil">
+            <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-all">
+              <ArrowLeft className="w-5 h-5" />
+              <span className="font-medium">Kembali</span>
+            </button>
+          </Link>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900">{tryOutTitle}</h1>
+        <p className="text-gray-500 text-sm mt-1">{entries.length} peserta · Peringkat berdasarkan total skor</p>
       </motion.div>
 
-      {/* Posisi Kamu */}
+      {/* User rank card */}
       {userEntry && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p className="text-xs text-gray-400 font-medium mb-3">Posisi Kamu</p>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                {userName.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-900">{userName}</p>
-                <p className="text-sm text-gray-400">Skor: <span className="font-semibold text-[#2563EB]">{userScore}</span></p>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <div className="bg-[#2563EB] text-white rounded-2xl p-5">
+            <p className="text-blue-100 text-sm mb-1">Peringkat Kamu</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-black">
+                  #{userEntry.rank}
+                </div>
+                <div>
+                  <p className="font-bold text-lg">{userEntry.name}</p>
+                  <p className="text-blue-100 text-sm">dari {entries.length} peserta</p>
+                </div>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-black text-[#2563EB]">#{userRank}</p>
-                <p className="text-xs text-gray-400">dari {totalParticipants.toLocaleString('id-ID')}</p>
+                <p className="text-3xl font-black">{userEntry.score}</p>
+                <p className="text-blue-100 text-sm">poin</p>
               </div>
             </div>
           </div>
@@ -168,109 +166,92 @@ export default function RankingPage() {
       )}
 
       {/* Leaderboard */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-50">
-            <h2 className="text-sm font-bold text-gray-900">Peringkat Peserta</h2>
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              Papan Peringkat
+            </h2>
           </div>
 
-          <div className="divide-y divide-gray-50 px-2 py-2 space-y-1">
+          <div className="divide-y divide-gray-50">
             {/* Top 3 */}
             {top3.map((entry, i) => (
               <motion.div
                 key={entry.rank}
-                initial={{ opacity: 0, x: -8 }}
+                initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.15 + i * 0.05 }}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${rankRowStyle(entry.rank, entry.isUser)}`}
+                transition={{ delay: 0.1 + i * 0.04 }}
+                className={`flex items-center gap-4 p-4 ${rankRowStyle(entry.rank, entry.isUser)}`}
               >
                 <div className="w-8 flex items-center justify-center flex-shrink-0">
-                  {rankBadge(entry.rank)}
+                  {rankBadge(entry.rank, entry.isUser)}
                 </div>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                  entry.isUser ? 'bg-[#2563EB] text-white' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {entry.isUser
-                    ? userName.charAt(0).toUpperCase()
-                    : entry.name.charAt(0).toUpperCase()
-                  }
+                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-gray-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-800'}`}>
-                    {entry.name}
-                    {entry.isUser && <span className="ml-1.5 text-xs bg-[#2563EB] text-white px-1.5 py-0.5 rounded-full">Kamu</span>}
+                  <p className={`font-semibold truncate ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
+                    {entry.name} {entry.isUser && <span className="text-xs font-normal">(Kamu)</span>}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className={`text-base font-black ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
+                  <p className={`text-lg font-bold ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
                     {entry.score}
                   </p>
+                  <p className="text-xs text-gray-400">poin</p>
                 </div>
               </motion.div>
             ))}
 
-            {/* Separator */}
+            {/* Separator jika ada gap antara top3 dan posisi user */}
             {showSeparator && (
-              <div className="flex items-center gap-2 px-3 py-1">
-                <div className="flex-1 border-t border-dashed border-gray-200" />
-                <span className="text-xs text-gray-400">···</span>
-                <div className="flex-1 border-t border-dashed border-gray-200" />
+              <div className="flex items-center gap-4 p-3 bg-gray-50">
+                <div className="w-8 text-center text-gray-300 text-xs">···</div>
+                <p className="text-xs text-gray-400">Peserta lainnya</p>
               </div>
             )}
 
-            {/* Sekitar user */}
-            {others.map((entry, i) => (
+            {/* Peserta lain (termasuk user jika bukan top 3) */}
+            {others.slice(0, showSeparator && userInOthers
+              ? Math.max(others.indexOf(userInOthers) + 2, 5)
+              : 10
+            ).map((entry, i) => (
               <motion.div
                 key={entry.rank}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.04 }}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${rankRowStyle(entry.rank, entry.isUser)}`}
+                transition={{ delay: 0.2 + i * 0.03 }}
+                className={`flex items-center gap-4 p-4 ${rankRowStyle(entry.rank, entry.isUser)}`}
               >
                 <div className="w-8 flex items-center justify-center flex-shrink-0">
-                  {rankBadge(entry.rank)}
+                  {rankBadge(entry.rank, entry.isUser)}
                 </div>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                  entry.isUser ? 'bg-[#2563EB] text-white' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {entry.name.charAt(0).toUpperCase()}
+                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-gray-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-800'}`}>
-                    {entry.name}
-                    {entry.isUser && <span className="ml-1.5 text-xs bg-[#2563EB] text-white px-1.5 py-0.5 rounded-full">Kamu</span>}
+                  <p className={`font-semibold truncate ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
+                    {entry.name} {entry.isUser && <span className="text-xs font-normal">(Kamu)</span>}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className={`text-base font-black ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
+                  <p className={`text-lg font-bold ${entry.isUser ? 'text-[#2563EB]' : 'text-gray-900'}`}>
                     {entry.score}
                   </p>
+                  <p className="text-xs text-gray-400">poin</p>
                 </div>
               </motion.div>
             ))}
-          </div>
 
-          <div className="px-5 py-3 border-t border-gray-50 bg-gray-50/50">
-            <p className="text-xs text-gray-400 text-center">
-              Menampilkan peringkat di sekitar posisi kamu dari {totalParticipants.toLocaleString('id-ID')} peserta
-            </p>
+            {entries.length > 13 && (
+              <div className="p-4 text-center text-sm text-gray-400">
+                +{entries.length - 13} peserta lainnya
+              </div>
+            )}
           </div>
         </div>
-      </motion.div>
-
-      {/* Actions */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-        className="flex gap-3">
-        <Link to={`/tryout/${id}/pembahasan`} className="flex-1">
-          <button className="w-full py-3 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1d4ed8] transition-all">
-            Lihat Pembahasan
-          </button>
-        </Link>
-        <Link to={`/tryout/${id}/exam`} className="flex-1">
-          <button className="w-full py-3 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
-            Ulangi Try Out
-          </button>
-        </Link>
       </motion.div>
     </div>
   );

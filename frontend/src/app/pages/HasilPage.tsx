@@ -19,18 +19,13 @@ export default function HasilPage() {
   const { results: backendResults, loading: resultsLoading } = useResults();
 
 
-  // Read real exam results — NO MOCK FALLBACK
+  // FIX B5: gunakan data backend — localStorage fallback hanya saat masih loading
   const realResults = React.useMemo(() => {
-    if (backendResults.length > 0) return backendResults;
+    if (!resultsLoading) return backendResults; // backend selesai → pakai ini saja
     const raw = localStorage.getItem('exam_results');
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {}
-    }
+    if (raw) { try { return JSON.parse(raw) || []; } catch {} }
     return [];
-  }, [backendResults]);
+  }, [backendResults, resultsLoading]);
 
   const latestResult = realResults[0];
   const avgScore = realResults.length > 0
@@ -58,18 +53,31 @@ export default function HasilPage() {
   }, [realResults]);
 
   // Subject scores for bar chart
-  const subjectData = (latestResult?.subScores || []).map((s: any, index: number) => ({
-    id: `${s.code || s.subject}-${index}`,
-    name: s.code || s.subject.split(' ')[0], // short code for chart
-    fullName: s.subject,
-    score: Math.round((s.score / s.maxScore) * 100),
-    nilai: s.score,
-    maxScore: s.maxScore,
-  }));
+  // FIX B4: backend kirim { subtest, scaledScore, ... } bukan { subject, score, maxScore }
+  const normalizeSubScore = (s: any) => ({
+    subject:  s.subject    || s.subtest  || s.code || 'Unknown',
+    code:     s.code       || s.subtest  || '',
+    score:    s.score      ?? s.scaledScore ?? 0,
+    maxScore: s.maxScore   ?? 1000,
+    correct:  s.correct    ?? 0,
+  });
+
+  const subjectData = (latestResult?.subScores || []).map((s: any, index: number) => {
+    const ns = normalizeSubScore(s);
+    return {
+      id: `${ns.code || ns.subject}-${index}`,
+      name: ns.code || ns.subject.split(' ')[0],
+      fullName: ns.subject,
+      score: ns.maxScore > 0 ? Math.round((ns.score / ns.maxScore) * 100) : 0,
+      nilai: ns.score,
+      maxScore: ns.maxScore,
+    };
+  });
 
   // Weakest subjects
   const weakestSubjects = [...(latestResult?.subScores || [])]
-    .sort((a, b) => (a.score / a.maxScore) - (b.score / b.maxScore))
+    .map(normalizeSubScore)
+    .sort((a, b) => (a.score / (a.maxScore || 1)) - (b.score / (b.maxScore || 1)))
     .slice(0, 2);
 
 
@@ -396,12 +404,17 @@ export default function HasilPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {score.subScores.map((sub: any, subIdx: number) => (
-                    <div key={`${sub.subject}-${subIdx}`} className="text-sm bg-gray-50 px-3 py-1 rounded-lg">
-                      <span className="font-medium text-gray-700">{sub.subject}:</span>
-                      <span className="ml-1 text-gray-900">{sub.score}/{sub.maxScore}</span>
-                    </div>
-                  ))}
+                  {(score.subScores || []).map((sub: any, subIdx: number) => {
+                    const ns = normalizeSubScore(sub);
+                    return (
+                      <div key={`${ns.code || ns.subject}-${subIdx}`} className="text-sm bg-gray-50 px-3 py-1 rounded-lg">
+                        <span className="font-medium text-gray-700">{ns.subject}:</span>
+                        <span className="ml-1 text-gray-900">{ns.score}
+                          {ns.maxScore > 0 && <span className="text-gray-400">/{ns.maxScore}</span>}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <Link to={`/tryout/${score.tryOutId}/pembahasan`}>

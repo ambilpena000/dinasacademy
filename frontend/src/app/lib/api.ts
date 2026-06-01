@@ -95,7 +95,9 @@ export const api = {
   getTryout:  (id: string) => request(`/tryouts/${id}`),
 
   // ── Questions (FIX #2: support paginasi) ─────────────────────────
-  getQuestions: (tryoutId: string) => request(`/questions/tryout/${tryoutId}`),
+  getQuestions:            (tryoutId: string) => request(`/questions/tryout/${tryoutId}`),
+  // FIX B1: include correctAnswer + explanation untuk halaman pembahasan
+  getQuestionsWithAnswers: (tryoutId: string) => request(`/questions/tryout/${tryoutId}/pembahasan`),
   getAllQuestions: (tryoutId?: string, page = 1, limit = 50) =>
     request(`/questions?page=${page}&limit=${limit}${tryoutId ? `&tryoutId=${tryoutId}` : ''}`),
   createQuestion:  (data: any) =>

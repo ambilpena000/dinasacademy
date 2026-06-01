@@ -12,10 +12,18 @@ export class ResultsController {
     return this.resultsService.getUserResults(req.user.id);
   }
 
-  // Frontend: GET /results/:tryoutId/ranking
+  // FIX B7 + B8: ranking kembalikan data anonim + strip field sensitif
   @Get(':tryoutId/ranking')
-  getRanking(@Param('tryoutId') tryoutId: string) {
-    return this.resultsService.getRanking(parseInt(tryoutId));
+  async getRanking(@Param('tryoutId') tryoutId: string) {
+    const results = await this.resultsService.getRanking(parseInt(tryoutId));
+    return results.map((r: any, i: number) => ({
+      rank:        i + 1,
+      userId:      r.userId,          // perlu untuk highlight baris user sendiri
+      totalScore:  Math.round(Number(r.totalScore)),
+      category:    r.category,
+      completedAt: r.completedAt,
+      // TIDAK kirim: answers, subScores, percentage, correct/wrong
+    }));
   }
 
   @Get(':tryoutId')

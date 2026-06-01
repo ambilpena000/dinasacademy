@@ -121,9 +121,20 @@ export class ExamService {
       percentage:     scored.percentage,
       rank:           0,
       totalParticipants: 1,
-      subScores:      scored as any,
+      subScores:      scored.subScores as any,  // FIX: simpan array subScores, bukan whole object
       completedAt:    new Date(),
     });
+
+    // FIX B8: hitung rank nyata dari semua peserta tryout ini
+    try {
+      const allResults = await this.resultsService.getRanking(submission.tryoutId);
+      const totalParticipants = allResults.length;
+      const userPos = allResults.findIndex((r: any) => r.userId === userId);
+      const rank = userPos >= 0 ? userPos + 1 : totalParticipants;
+      await this.resultsService.updateRank(result.id, rank, totalParticipants);
+      result.rank = rank;
+      result.totalParticipants = totalParticipants;
+    } catch { /* jika gagal, rank tetap 0 — tidak critical */ }
 
     await this.draftRepo.delete({ userId, tryoutId: submission.tryoutId });
     return result;
