@@ -1,7 +1,7 @@
 // order.entity.ts
 import {
   Entity, Column, PrimaryGeneratedColumn,
-  CreateDateColumn, ManyToOne, JoinColumn
+  CreateDateColumn, ManyToOne,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 

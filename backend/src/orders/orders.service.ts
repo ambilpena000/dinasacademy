@@ -32,7 +32,7 @@ export class OrdersService {
     return this.orderRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
   }
 
-  async handlePaymentWebhook(body: any) {
+  async handlePaymentWebhook(_body: any) {
     return { received: true };
   }
 

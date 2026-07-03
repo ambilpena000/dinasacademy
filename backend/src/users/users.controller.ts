@@ -26,7 +26,7 @@ export class UsersController {
 
   @Put('profile/me')
   updateProfileMe(@Request() req: any, @Body() body: any) {
-    const { password, role, ...safeData } = body;
+    const { password: _password, role: _role, ...safeData } = body;
     return this.usersService.update(req.user.id, safeData);
   }
 
@@ -37,7 +37,7 @@ export class UsersController {
 
   @Put('profile')
   updateProfile(@Request() req: any, @Body() body: any) {
-    const { password, role, ...safeData } = body;
+    const { password: _password, role: _role, ...safeData } = body;
     return this.usersService.update(req.user.id, safeData);
   }
 

@@ -120,7 +120,7 @@ export class AuthService {
     }
 
     try {
-      const nodemailer = require('nodemailer');
+      const nodemailer = await import('nodemailer');
       const transporter = nodemailer.createTransport({
         host:   smtpHost,
         port:   this.configService.get<number>('SMTP_PORT', 587),

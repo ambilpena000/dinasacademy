@@ -18,7 +18,6 @@ import ProfilePage from './pages/ProfilePage';
 import LockedStatePage from './pages/LockedStatePage';
 import DraggableWA from '../app/components/DraggableWA';
 import RankingPage from './pages/RankingPage';
-import { mockUser } from './data/mockData';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminQuestions from './pages/admin/AdminQuestions';

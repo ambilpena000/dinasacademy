@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, X, Plus, Trash2, Edit3, BookOpen,
-  Save, ChevronDown, CheckCircle, AlertCircle, Filter
+  Save, ChevronDown, CheckCircle, AlertCircle, Filter, Upload
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
-import { api } from '../../lib/api';
+import { api, adminApi } from '../../lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Question {
@@ -112,6 +112,26 @@ export default function AdminQuestions() {
   // UI states
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await adminApi.uploadQuestions(file);
+      showToast(`Berhasil mengimpor ${res.imported || 0} soal!`);
+      if (res.errors?.length > 0) {
+        console.warn('Import warnings:', res.errors);
+      }
+      fetchQuestions();
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal mengimpor file', 'error');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   // ── Fetch data ────────────────────────────────────────────────────
   const fetchQuestions = React.useCallback(() => {
@@ -256,10 +276,21 @@ export default function AdminQuestions() {
   return (
     <AdminLayout title="📝 Bank Soal" subtitle="Tambah, edit, dan kelola soal Try Out"
       actions={
-        <button onClick={() => { cancelForm(); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-sm font-semibold rounded-xl transition-all">
-          <Plus className="w-4 h-4" /> Tambah Soal
-        </button>
+        <div className="flex items-center gap-2.5">
+          <label className={`flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 text-[#2563EB] hover:bg-blue-50 text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-sm ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+            {uploading ? (
+              <svg className="animate-spin w-4 h-4 text-[#2563EB]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            {uploading ? 'Mengimpor...' : 'Import PDF / JSON'}
+            <input type="file" accept=".pdf,.json" onChange={handleFileUpload} disabled={uploading} className="hidden" />
+          </label>
+          <button onClick={() => { cancelForm(); setShowForm(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
+            <Plus className="w-4 h-4" /> Tambah Soal
+          </button>
+        </div>
       }>
 
       <AnimatePresence>

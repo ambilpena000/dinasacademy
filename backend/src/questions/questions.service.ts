@@ -123,7 +123,7 @@ export class QuestionsService {
 
   private async importFromPdf(buffer: Buffer): Promise<{ imported: number; errors: string[] }> {
     let pdfParse: any;
-    try { pdfParse = require('pdf-parse'); } catch {
+    try { pdfParse = (await import('pdf-parse')).default; } catch {
       throw new BadRequestException('Library pdf-parse belum terpasang. Jalankan: npm install pdf-parse');
     }
     let fullText = '';
@@ -135,7 +135,7 @@ export class QuestionsService {
     }
 
     const blocks = fullText
-      .split(/\n(?=\d+[\.\)])/g)
+      .split(/\n(?=\d+[.)])/g)
       .map((b: string) => b.trim())
       .filter((b: string) => b.length > 10);
 
@@ -144,16 +144,16 @@ export class QuestionsService {
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const idx   = i + 1;
-      const optA  = block.match(/\bA[\.\)]\s*(.+)/i)?.[1]?.trim();
-      const optB  = block.match(/\bB[\.\)]\s*(.+)/i)?.[1]?.trim();
-      const optC  = block.match(/\bC[\.\)]\s*(.+)/i)?.[1]?.trim();
-      const optD  = block.match(/\bD[\.\)]\s*(.+)/i)?.[1]?.trim();
-      const optE  = block.match(/\bE[\.\)]\s*(.+)/i)?.[1]?.trim();
+      const optA  = block.match(/\bA[.)]\s*(.+)/i)?.[1]?.trim();
+      const optB  = block.match(/\bB[.)]\s*(.+)/i)?.[1]?.trim();
+      const optC  = block.match(/\bC[.)]\s*(.+)/i)?.[1]?.trim();
+      const optD  = block.match(/\bD[.)]\s*(.+)/i)?.[1]?.trim();
+      const optE  = block.match(/\bE[.)]\s*(.+)/i)?.[1]?.trim();
       const ans   = block.match(/JAWABAN\s*[:=]\s*([A-Ea-e])/i);
       const expl  = block.match(/PEMBAHASAN\s*[:=]\s*(.+)/is);
       const questionText = block
-        .replace(/^\d+[\.\)]\s*/, '')
-        .replace(/\n[A-Ea-e][\.\)].+/g, '')
+        .replace(/^\d+[.)]\s*/, '')
+        .replace(/\n[A-Ea-e][.)].+/g, '')
         .replace(/JAWABAN\s*[:=].+/is, '')
         .replace(/PEMBAHASAN\s*[:=].+/is, '')
         .trim();

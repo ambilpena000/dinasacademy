@@ -9,13 +9,17 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTryouts } from '../hooks/useTryouts';
 import { useResults } from '../hooks/useResults';
-import { mockPackages } from '../data/mockData';
+import { api } from '../lib/api';
 
 export default function DashboardPage() {
   const { user: authUser, refreshUser } = useAuth();
+  const [packages, setPackages] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     refreshUser();
+    api.getPackages().then((data: any[]) => {
+      if (Array.isArray(data)) setPackages(data);
+    }).catch(() => {});
   }, []);
 
   // Hasil dari backend/localStorage — NO MOCK FALLBACK
@@ -32,15 +36,15 @@ export default function DashboardPage() {
     return raw ? JSON.parse(raw) : [];
   }, []);
 
-  // Hitung max tryout sesuai paket
+  // Hitung max tryout sesuai paket dari backend database
   const maxTryouts = React.useMemo(() => {
     if (!authUser?.packageType) return 0;
-    const pkg = mockPackages.find(p =>
-      p.name.toLowerCase() === (authUser.packageType || '').toLowerCase() ||
-      (authUser.packageType || '').toLowerCase().includes(p.name.toLowerCase().split(' ')[1]?.toLowerCase() || '')
+    const pkg = packages.find(p =>
+      p.name?.toLowerCase() === (authUser.packageType || '').toLowerCase() ||
+      (authUser.packageType || '').toLowerCase().includes(p.name?.toLowerCase().split(' ')[1]?.toLowerCase() || '')
     );
-    return pkg?.includedTryOuts || 999;
-  }, [authUser]);
+    return pkg?.includedTryouts || pkg?.includedTryOuts || 999;
+  }, [authUser, packages]);
 
   // Filter tryout sesuai kategori paket
   const allowedCategories = React.useMemo((): string[] => {
