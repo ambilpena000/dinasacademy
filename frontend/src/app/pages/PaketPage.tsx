@@ -25,6 +25,7 @@ export default function PaketPage() {
   const [checkoutMode, setCheckoutMode] = useState(false);
   const [packages, setPackages] = useState<any[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
+  const [packagesError, setPackagesError] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'ewallet'>('transfer');
   const [orderSubmitted, setOrderSubmitted] = useState(false);
@@ -59,12 +60,9 @@ export default function PaketPage() {
         setPackages(mapped);
         if (mapped.length > 0) setSelectedPackage(mapped[0]);
       })
-      .catch(() => {
-        // Fallback: gunakan mock data jika backend belum tersedia
-        import('../data/mockData').then(({ mockPackages }) => {
-          setPackages(mockPackages as any[]);
-          setSelectedPackage(mockPackages[0] as any);
-        });
+      .catch((err: any) => {
+        // BUG FIX A1: Tampilkan error state — jangan tampilkan data palsu ke user
+        setPackagesError(err?.message || 'Gagal memuat paket. Periksa koneksi dan coba lagi.');
       })
       .finally(() => setPackagesLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,6 +226,27 @@ export default function PaketPage() {
   }
 
   if (!selectedPackage) return null;
+
+  // BUG FIX A1: Tampilkan error state jika backend gagal — bukan data palsu
+  if (packagesError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 px-4">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 mb-2">Gagal Memuat Paket</h3>
+        <p className="text-sm text-gray-500 text-center mb-6 max-w-xs">{packagesError}</p>
+        <button
+          onClick={() => { setPackagesError(null); setPackagesLoading(true); window.location.reload(); }}
+          className="px-6 py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all">
+          Coba Lagi
+        </button>
+      </div>
+    );
+  }
 
   // If in checkout mode, show checkout view
   if (checkoutMode) {

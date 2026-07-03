@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTryouts } from '../hooks/useTryouts';
 import { useResults } from '../hooks/useResults';
+import { mockPackages } from '../data/mockData';
 
 export default function DashboardPage() {
   const { user: authUser, refreshUser } = useAuth();
@@ -32,18 +33,13 @@ export default function DashboardPage() {
   }, []);
 
   // Hitung max tryout sesuai paket
-  // FIX B3: maxTryouts tanpa mockPackages
   const maxTryouts = React.useMemo(() => {
     if (!authUser?.packageType) return 0;
-    const pkg = (authUser.packageType || '').toLowerCase();
-    if (pkg.includes('premium') && (pkg.includes('snbt') || pkg.includes('ptn'))) return 15;
-    if (pkg.includes('standar') && (pkg.includes('snbt') || pkg.includes('ptn'))) return 8;
-    if (pkg.includes('basic')   && (pkg.includes('snbt') || pkg.includes('ptn'))) return 4;
-    if (pkg.includes('premium') && pkg.includes('skd'))  return 12;
-    if (pkg.includes('standar') && pkg.includes('skd'))  return 6;
-    if (pkg.includes('premium') && pkg.includes('stis')) return 10;
-    if (pkg.includes('combo')   || pkg.includes('lengkap')) return 999;
-    return 999;
+    const pkg = mockPackages.find(p =>
+      p.name.toLowerCase() === (authUser.packageType || '').toLowerCase() ||
+      (authUser.packageType || '').toLowerCase().includes(p.name.toLowerCase().split(' ')[1]?.toLowerCase() || '')
+    );
+    return pkg?.includedTryOuts || 999;
   }, [authUser]);
 
   // Filter tryout sesuai kategori paket
@@ -238,11 +234,16 @@ export default function DashboardPage() {
 
               {recentScore.subScores && recentScore.subScores.length > 0 && (
                 <div className="space-y-3 mb-5">
-                  {recentScore.subScores.slice(0, 4).map((sub: any) => {
-                    const pct = Math.round((sub.score / sub.maxScore) * 100);
+                  {recentScore.subScores.slice(0, 4).map((sub: any, idx: number) => {
+                    // BUG FIX E1/A9: normalize field name — backend kirim subtest/scaledScore,
+                    // localStorage mungkin simpan legacy format subject/score/maxScore
+                    const label    = sub.code    || sub.subtest || sub.subject || `S${idx + 1}`;
+                    const score    = sub.scaledScore ?? sub.score    ?? 0;
+                    const maxScore = sub.maxScore   ?? 1000;
+                    const pct      = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 0;
                     return (
-                      <div key={sub.code} className="flex items-center gap-4">
-                        <span className="text-sm font-bold text-gray-400 w-12 flex-shrink-0">{sub.code}</span>
+                      <div key={`${label}-${idx}`} className="flex items-center gap-4">
+                        <span className="text-sm font-bold text-gray-400 w-12 flex-shrink-0">{label}</span>
                         <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                           <motion.div className="h-full bg-[#2563EB] rounded-full"
                             initial={{ width: 0 }} animate={{ width: `${pct}%` }}

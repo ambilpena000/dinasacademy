@@ -188,8 +188,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setOrders([]);
+
+    // Hapus auth tokens
     localStorage.removeItem('user');
     localStorage.removeItem('access_token');
+
+    // BUG FIX E5: Hapus SEMUA data sensitif user agar tidak bocor ke user berikutnya
+    // di perangkat yang sama
+    localStorage.removeItem('exam_results');
+    localStorage.removeItem('completed_tryouts');
+    localStorage.removeItem('streak_data');
+
+    // Hapus semua draft ujian (key: exam_draft_<tryoutId>)
+    const keysToDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('exam_draft_')) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => localStorage.removeItem(key));
   };
 
   // ── UPDATE PROFILE ────────────────────────────────────────────────
