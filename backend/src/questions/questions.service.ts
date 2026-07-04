@@ -26,6 +26,7 @@ export class QuestionsService {
     const where = tryoutId ? { tryoutId } : {};
     const [data, total] = await this.questionRepo.findAndCount({
       where,
+      relations: ['tryout'],
       order: { tryoutId: 'ASC', orderIndex: 'ASC' },
       skip: (page - 1) * limit,
       take: limit,

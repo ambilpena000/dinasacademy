@@ -125,7 +125,7 @@ export default function PaketPage() {
 
 
 
-  const subtotal = selectedPackage.price;
+  const subtotal = selectedPackage?.price ?? 0;
   // Kode unik 3 digit dari user ID — untuk verifikasi transfer tanpa cek manual
   const uniqueCode = React.useMemo(() => {
   const raw = String(user?.id ?? user?.email ?? '');
@@ -646,8 +646,8 @@ export default function PaketPage() {
         </div>
       </motion.div>
 
-      {/* Package Cards - Grid Layout 6 Cards */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Package Cards - Compact Grid Layout */}
+      <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-5">
         {filteredPackages.map((pkg, index) => {
           const isSubscribed = isPackageSubscribed(pkg.name);
           const isBest = pkg.isPopular;
@@ -693,7 +693,7 @@ export default function PaketPage() {
                   </div>
                 )}
 
-                <CardContent className="pt-4 pb-5 flex flex-col h-full">
+                <CardContent className="p-5 flex flex-col h-full">
                   {/* Package Icon - Blue Gradient with Animation */}
                   <motion.div
                     whileHover={{ rotate: 360, scale: 1.1 }}

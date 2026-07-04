@@ -5,10 +5,11 @@ import { MulterModule } from '@nestjs/platform-express';
 import { QuestionsService } from './questions.service';
 import { QuestionsController } from './questions.controller';
 import { Question } from './question.entity';
+import { Tryout } from '../tryouts/tryout.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Question]),
+    TypeOrmModule.forFeature([Question, Tryout]),
     MulterModule.register({ dest: './uploads' }),
   ],
   providers: [QuestionsService],

@@ -1,6 +1,7 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn
+  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn
 } from 'typeorm';
+import { Tryout } from '../tryouts/tryout.entity';
 
 @Entity()
 export class Question {
@@ -9,6 +10,10 @@ export class Question {
 
   @Column()
   tryoutId!: number;
+
+  @ManyToOne(() => Tryout, { nullable: false })
+  @JoinColumn({ name: 'tryoutId' })
+  tryout?: Tryout;
 
   @Column()
   subtestCode!: string;

@@ -136,9 +136,10 @@ export default function AdminQuestions() {
   // ── Fetch data ────────────────────────────────────────────────────
   const fetchQuestions = React.useCallback(() => {
     setQLoading(true);
-    api.getAllQuestions()
-      .then((data: any[]) => {
-        const mapped: Question[] = data.map((q: any) => ({
+    api.getAllQuestions('', 1, 2000)
+      .then((res: any) => {
+        const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        const mapped: Question[] = list.map((q: any) => ({
           id: String(q.id),
           paket: mapCategory(q.tryout?.category || q.category || ''),
           subject: q.subtestName || q.subtestCode || '',
@@ -158,7 +159,7 @@ export default function AdminQuestions() {
         }));
         setQuestions(mapped);
       })
-      .catch(() => setQuestions([]))
+      .catch((err: any) => { console.error('fetchQuestions error:', err); setQuestions([]); })
       .finally(() => setQLoading(false));
   }, []);
 
@@ -252,7 +253,13 @@ export default function AdminQuestions() {
   const cancelForm = () => { setShowForm(false); setEditingQ(null); setForm(EMPTY_QUESTION); };
 
   // ── Filter logic ──────────────────────────────────────────────────
-  const subjects = ['all', ...Array.from(new Set(questions.map(q => q.subject).filter(Boolean)))];
+  // Subject filter mengikuti paket: SKD hanya TWK/TIU/TKP, SNBT hanya PU/PPU/dll
+  const subjects = ['all', ...Array.from(new Set(
+    questions
+      .filter(q => paketFilter === 'all' || q.paket === paketFilter)
+      .map(q => q.subject)
+      .filter(Boolean)
+  ))];
   const tryOutsForFilter = ['all', ...Array.from(new Set(
     questions
       .filter(q => paketFilter === 'all' || q.paket === paketFilter)
@@ -317,7 +324,7 @@ export default function AdminQuestions() {
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              className="bg-white rounded-2xl border-2 border-[#2563EB] shadow-sm overflow-hidden">
+              className="max-w-3xl mx-auto bg-white rounded-2xl border-2 border-[#2563EB] shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-blue-100 bg-blue-50">
                 <h3 className="text-sm font-bold text-[#2563EB]">{editingQ ? '✏️ Edit Soal' : '➕ Tambah Soal Baru'}</h3>
                 <button onClick={cancelForm} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>

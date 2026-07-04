@@ -15,12 +15,39 @@ import {
 import { Button } from '../components/Button';
 import DraggableWA from '../components/DraggableWA';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { api } from '../lib/api';
 
 
 
 
 export default function LandingPage() {
   const sliderRef = useRef<any>(null);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
+
+  useEffect(() => {
+    api.getPackages()
+      .then((data: any[]) => {
+        if (Array.isArray(data)) {
+          setPackages(data.map((p: any, i: number) => ({
+            id: String(p.id),
+            name: p.name,
+            description: p.description,
+            price: Number(p.price),
+            duration: typeof p.duration === 'number'
+              ? (p.duration >= 360 ? '12 bulan' : p.duration >= 170 ? '6 bulan' : `${p.duration} hari`)
+              : (typeof p.duration === 'string' ? p.duration : '12 bulan'),
+            features: Array.isArray(p.features) ? p.features : [],
+            includedTryOuts: Array.isArray(p.includedTryouts)
+              ? p.includedTryouts.length
+              : (typeof p.includedTryOuts === 'number' ? p.includedTryOuts : 0),
+            isPopular: i === 0,
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPackagesLoading(false));
+  }, []);
 
   const testimonials = [
     {
@@ -103,55 +130,6 @@ export default function LandingPage() {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
-
-  const paketData = [
-    {
-      name: 'Paket Lengkap Masuk PTN',
-      price: 'Rp 2.999.000',
-      originalPrice: 'Rp 5.999.000',
-      features: [
-        'Mentoring Persiapan SNBP Intensif',
-        'Rasionalisasi SNBP Eksklusif',
-        'Prediksi Peluang Lolos SNBP',
-        'Sistem Penilaian Sesuai Permendikbudristek 62/2023',
-        'Strategi Pemilihan Prodi yang Tepat',
-        '60+ Paket Tryout UTBK-SNBT',
-        'Pembahasan Detail Setiap Soal',
-        'Ranking Nasional Real-time'
-      ]
-    },
-    {
-      name: 'Paket PTN SNBT',
-      price: 'Rp 1.999.000',
-      originalPrice: 'Rp 3.999.000',
-      features: [
-        '36x Try Out Tes Potensi Skolastik',
-        '42x Try Out Tes Literasi',
-        '10+ Paket Tryout UTBK-SNBT',
-        'Pembahasan Lengkap Setiap Soal',
-        'Simulasi CAT Real-time',
-        'Rekomendasi PTN Berdasarkan Skor',
-        'Dashboard Analytics Real-time',
-        'Timer & Review Jawaban'
-      ],
-      popular: true
-    },
-    {
-      name: 'Paket Mandiri PTN',
-      price: 'Rp 2.499.000',
-      originalPrice: 'Rp 4.999.000',
-      features: [
-        '24x Try Out Seleksi Mandiri',
-        'Prediksi Peluang Lolos',
-        'Free Konsultasi dengan Konsultan Pendidikan',
-        'Bank Soal Latihan 3000+',
-        'Pembahasan Soal HD',
-        'Try Out Simulasi Mandiri',
-        'Strategi Lolos Seleksi Mandiri',
-        'Ranking Peserta Nasional'
-      ]
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-sky-50 overflow-hidden">
@@ -456,63 +434,122 @@ export default function LandingPage() {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {paketData.map((paket, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.15 }}
-                whileHover={{ y: -8 }}
-                className="relative group"
-              >
-                {paket.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                    <div className="bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] text-white px-6 py-2 rounded-full text-sm font-black shadow-lg">
-                      ⭐ TERPOPULER
-                    </div>
-                  </div>
-                )}
-                <div className={`bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all ${paket.popular ? 'ring-2 ring-[#FBBF24]' : ''} h-full border border-gray-100`}>
-                  <div className="p-8 border-b border-gray-100">
-                    <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-blue-100 to-sky-100 rounded-full mb-4">
-                      <span className="text-sm font-bold text-blue-700">💰 Hemat 50%</span>
-                    </div>
-                    <h3 className="text-2xl font-black text-gray-900 mb-4">{paket.name}</h3>
-                    <div className="mb-2">
-                      <span className="text-sm line-through text-gray-400">{paket.originalPrice}</span>
-                    </div>
-                    <div className="text-4xl font-black bg-gradient-to-r from-[#2563EB] to-[#3B82F6] bg-clip-text text-transparent">
-                      {paket.price}
-                    </div>
-                  </div>
+          {packagesLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-10 h-10 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-5">
+              {packages.map((pkg, index) => (
+                <motion.div
+                  key={pkg.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.15 }}
+                  whileHover={{ y: -8 }}
+                  className="relative"
+                >
+                  <div className={`bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all h-full border-2 ${
+                    pkg.isPopular ? 'border-[#2563EB] ring-2 ring-blue-200' : 'border-gray-100'
+                  }`}>
+                    {/* Popular Badge */}
+                    {pkg.isPopular && (
+                      <div className="absolute top-3 right-3 z-10">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                          ⭐ TERBAIK
+                        </span>
+                      </div>
+                    )}
 
-                  <div className="p-8">
-                    <p className="text-sm font-bold text-gray-900 mb-4">Fasilitas yang kamu dapat :</p>
-                    <ul className="space-y-3 mb-6">
-                      {paket.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-sky-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                          <span className="text-sm text-gray-700 leading-relaxed">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Link to="/paket">
-                      <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                        <Button className="w-full bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] font-bold text-white shadow-lg">
-                          Pilih Paket
-                        </Button>
+                    <div className="p-5 flex flex-col h-full">
+                      {/* Icon */}
+                      <motion.div
+                        whileHover={{ rotate: 360, scale: 1.1 }}
+                        transition={{ duration: 0.6 }}
+                        className="w-12 h-12 mb-4 mx-auto rounded-xl flex items-center justify-center bg-gradient-to-br from-[#2563EB] to-[#3B82F6] shadow-lg"
+                      >
+                        <FileText className="w-6 h-6 text-white" />
                       </motion.div>
-                    </Link>
+
+                      {/* Name & Description */}
+                      <div className="text-center mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">{pkg.name}</h3>
+                        <p className="text-gray-600 text-xs leading-snug">{pkg.description}</p>
+                      </div>
+
+                      {/* Pricing */}
+                      <div className="text-center mb-4 pb-4 border-b border-gray-200">
+                        <div className="flex items-baseline justify-center space-x-1 mb-0.5">
+                          <span className="text-3xl font-black bg-gradient-to-r from-[#2563EB] to-[#3B82F6] bg-clip-text text-transparent">
+                            {(pkg.price / 1000).toFixed(0)}K
+                          </span>
+                          <span className="text-gray-500 text-sm font-medium">/{pkg.duration}</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          <span className="line-through">Rp {((pkg.price * 1.3) / 1000).toFixed(0)}K</span>
+                          <span className="ml-1 text-green-600 font-semibold">-30%</span>
+                        </p>
+                      </div>
+
+                      {/* Features */}
+                      <div className="space-y-2 mb-4">
+                        {pkg.features.slice(0, 4).map((f: string, idx: number) => (
+                          <div key={idx} className="flex items-start space-x-2">
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-xs text-gray-700 leading-snug">{f}</span>
+                          </div>
+                        ))}
+                        {pkg.features.length > 4 && (
+                          <p className="text-xs text-gray-500 text-center pt-1">
+                            +{pkg.features.length - 4} fitur lainnya
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex-1" />
+
+                      {/* Try Out Count */}
+                      <div className="mb-4 p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-600 font-medium leading-none mb-0.5">Try Out</p>
+                            <p className="text-sm font-black text-[#2563EB] leading-none">
+                              {pkg.includedTryOuts} Paket
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CTA Button */}
+                      <Link to="/paket">
+                        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                          <Button className="w-full bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] font-bold text-white shadow-lg">
+                            Pilih Paket
+                          </Button>
+                        </motion.div>
+                      </Link>
+
+                      {/* Social Proof */}
+                      <div className="mt-3 text-center">
+                        <div className="flex items-center justify-center space-x-0.5 mb-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star key={star} className="w-3 h-3 text-yellow-400 fill-current" />
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          <span className="font-bold text-gray-900">{2000 + (index * 300)}+</span> siswa
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

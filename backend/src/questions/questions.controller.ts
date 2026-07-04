@@ -50,7 +50,7 @@ export class QuestionsController {
     return this.questionsService.findAll(
       tryoutId ? parseInt(tryoutId) : undefined,
       parseInt(page),
-      Math.min(parseInt(limit), 200), // cap 200 per halaman
+      Math.min(parseInt(limit), 5000), // cap 5000 per halaman
     );
   }
 

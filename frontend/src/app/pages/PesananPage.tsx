@@ -200,7 +200,7 @@ export default function PesananPage() {
   const activeCount  = orders.filter(o => o.status === 'active').length;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="w-full space-y-6">
 
       {/* Header */}
       <div>

@@ -677,8 +677,9 @@ async function seed() {
   const tryoutRepo = AppDataSource.getRepository<Tryout>(Tryout);
   const questionRepo = AppDataSource.getRepository(Question);
 
-  await questionRepo.clear();
-  await tryoutRepo.clear();
+  // TRUNCATE CASCADE agar FK constraint tidak memblokir
+  await AppDataSource.query('TRUNCATE TABLE "question" CASCADE');
+  await AppDataSource.query('TRUNCATE TABLE "tryout" CASCADE');
   console.log('🗑️  Data lama dihapus');
 
   let totalQuestions = 0;
