@@ -61,6 +61,7 @@ export default function PembahasanPage() {
           explanation: q.explanation || 'Pembahasan belum tersedia.',
           tips: q.tips || null,
           videoUrl: q.videoUrl || null,
+          optionWeights: q.optionWeights ? (typeof q.optionWeights === 'string' ? JSON.parse(q.optionWeights) : q.optionWeights) : null,
         })) : [];
         setQuestions(mapped);
       })
@@ -142,7 +143,10 @@ export default function PembahasanPage() {
         {questions.map((question, index) => {
           // Coba lookup jawaban user: bisa by questionId atau by index
           const userAnswer = userAnswers[String(question.id)] || userAnswers[String(index)] || '';
-          const isCorrect = userAnswer === question.correctAnswer;
+          const isTKP = question.subject === 'TKP';
+          const isCorrect = isTKP ? !!userAnswer : userAnswer === question.correctAnswer;
+          const tkpWeights = question.optionWeights || { a: 5, b: 4, c: 3, d: 2, e: 1 };
+          const userPoints = isTKP && userAnswer ? (tkpWeights[userAnswer] || 0) : 0;
 
           return (
             <motion.div
@@ -157,14 +161,20 @@ export default function PembahasanPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
-                        !userAnswer ? 'bg-gray-400' : isCorrect ? 'bg-green-500' : 'bg-red-500'
+                        !userAnswer ? 'bg-gray-400' : (isTKP ? 'bg-[#2563EB]' : (isCorrect ? 'bg-green-500' : 'bg-red-500'))
                       }`}>
                         {index + 1}
                       </div>
                       <div>
-                        <Badge variant={!userAnswer ? 'default' : isCorrect ? 'green' : 'red'}>
-                          {!userAnswer ? 'Tidak Dijawab' : isCorrect ? 'Benar' : 'Salah'}
-                        </Badge>
+                        {isTKP ? (
+                          <Badge variant={!userAnswer ? 'default' : 'blue'}>
+                            {!userAnswer ? 'Tidak Dijawab' : `Poin: ${userPoints}`}
+                          </Badge>
+                        ) : (
+                          <Badge variant={!userAnswer ? 'default' : isCorrect ? 'green' : 'red'}>
+                            {!userAnswer ? 'Tidak Dijawab' : isCorrect ? 'Benar' : 'Salah'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <Badge variant="blue">{question.subject}</Badge>
@@ -179,18 +189,26 @@ export default function PembahasanPage() {
                   <div className="space-y-3 mb-6">
                     {question.options.map((option: any) => {
                       const isUserAnswer = userAnswer === option.id;
-                      const isCorrectAnswer = question.correctAnswer === option.id;
+                      const isCorrectAnswer = !isTKP && (question.correctAnswer === option.id);
+                      const optionPoint = isTKP ? (tkpWeights[option.id] || 0) : null;
+                      
                       return (
                         <div key={option.id} className={`p-4 rounded-xl border-2 ${
-                          isCorrectAnswer
-                            ? 'border-green-500 bg-green-50'
-                            : isUserAnswer && !isCorrect
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-gray-200'
+                          isTKP
+                            ? (isUserAnswer ? 'border-[#2563EB] bg-blue-50' : 'border-gray-200')
+                            : (isCorrectAnswer
+                                ? 'border-green-500 bg-green-50'
+                                : isUserAnswer && !isCorrect
+                                ? 'border-red-500 bg-red-50'
+                                : 'border-gray-200')
                         }`}>
                           <div className="flex items-start space-x-3">
                             <div className="flex-shrink-0 mt-0.5">
-                              {isCorrectAnswer ? (
+                              {isTKP ? (
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                                  isUserAnswer ? 'border-[#2563EB] bg-[#2563EB] text-white' : 'border-gray-300 text-gray-500'
+                                }`}>{option.id.toUpperCase()}</div>
+                              ) : isCorrectAnswer ? (
                                 <CheckCircle className="w-6 h-6 text-green-600" />
                               ) : isUserAnswer && !isCorrect ? (
                                 <XCircle className="w-6 h-6 text-red-600" />
@@ -199,18 +217,34 @@ export default function PembahasanPage() {
                               )}
                             </div>
                             <div className="flex-1">
-                              <span className="font-medium text-gray-700 mr-2">{option.id.toUpperCase()}.</span>
+                              {!isTKP && <span className="font-medium text-gray-700 mr-2">{option.id.toUpperCase()}.</span>}
                               <span className={`${
-                                isCorrectAnswer ? 'text-green-900 font-semibold' :
-                                isUserAnswer && !isCorrect ? 'text-red-900' : 'text-gray-900'
+                                isTKP 
+                                  ? (isUserAnswer ? 'text-blue-900 font-semibold' : 'text-gray-900')
+                                  : (isCorrectAnswer ? 'text-green-900 font-semibold' :
+                                     isUserAnswer && !isCorrect ? 'text-red-900' : 'text-gray-900')
                               }`}>
                                 {option.text}
                               </span>
-                              {isUserAnswer && !isCorrect && (
+                              
+                              {isTKP && (
+                                <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${
+                                  optionPoint === 5 ? 'bg-green-100 text-green-700' :
+                                  optionPoint === 1 ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  Poin: {optionPoint}
+                                </span>
+                              )}
+
+                              {!isTKP && isUserAnswer && !isCorrect && (
                                 <span className="ml-2 text-sm text-red-600">(Jawaban kamu)</span>
                               )}
-                              {isCorrectAnswer && (
+                              {!isTKP && isCorrectAnswer && (
                                 <span className="ml-2 text-sm text-green-600">(Jawaban benar)</span>
+                              )}
+                              {isTKP && isUserAnswer && (
+                                <span className="ml-2 text-sm text-[#2563EB]">(Jawaban kamu)</span>
                               )}
                             </div>
                           </div>

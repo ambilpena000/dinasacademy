@@ -34,7 +34,7 @@ export function useResults() {
               wrong: r.wrong,
               unanswered: r.unanswered,
               totalQuestions: r.totalQuestions,
-              subScores: r.subScores || [],
+              subScores: Array.isArray(r.subScores) ? r.subScores : (r.subScores?.subScores || []),
               date: r.completedAt,
             }))
           : [];

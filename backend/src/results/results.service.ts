@@ -11,7 +11,10 @@ export class ResultsService {
   ) {}
 
   async getUserResults(userId: number) {
-    return this.resultRepo.find({ where: { userId } });
+    return this.resultRepo.find({ 
+      where: { userId },
+      order: { completedAt: 'DESC' }
+    });
   }
 
   async getResultByTryout(userId: number, tryoutId: number) {

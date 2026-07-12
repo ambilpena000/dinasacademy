@@ -121,7 +121,7 @@ export class ExamService {
       percentage:     scored.percentage,
       rank:           0,
       totalParticipants: 1,
-      subScores:      scored as any,
+      subScores:      scored.subScores,
       completedAt:    new Date(),
     });
 
