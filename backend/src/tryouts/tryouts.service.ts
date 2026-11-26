@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Tryout } from './tryout.entity';
 import { Question } from '../questions/question.entity';
+import { AccessUser, accessibleTryouts } from './tryout-access';
+import { normalizeCategory } from './category';
 
 export interface CreateTryoutDto {
   title: string;
   description: string;
-  category: string;       // 'SKD' | 'SNBT' | 'PTN' | 'STIS'
+  category: string;       // 'SNBT' (termasuk PTN) | 'SKD' | 'STIS'
   difficulty: string;     // 'Mudah' | 'Sedang' | 'Sulit'
   duration: number;       // menit
   totalQuestions: number;
@@ -54,6 +56,27 @@ export class TryoutsService {
     return results;
   }
 
+  /** Daftar try out yang boleh diakses user sesuai paketnya. */
+  async findAccessible(user: AccessUser | undefined) {
+    return accessibleTryouts(user, await this.findAll());
+  }
+
+  /**
+   * Pastikan user boleh mengerjakan try out ini (paket aktif, kategori & kuota paket).
+   * Melempar 404 bila tidak ada, 403 bila tidak berhak.
+   */
+  async assertAccess(user: AccessUser | undefined, tryoutId: number): Promise<Tryout> {
+    const all = await this.tryoutRepo.find({ order: { id: 'ASC' } });
+    const tryout = all.find((t) => t.id === tryoutId);
+    if (!tryout) throw new NotFoundException('Tryout tidak ditemukan');
+    if (user?.role === 'admin') return tryout;
+    if (!user?.hasPurchasedPackage) throw new ForbiddenException('Kamu belum berlangganan paket');
+    if (!accessibleTryouts(user, all).some((t) => t.id === tryoutId)) {
+      throw new ForbiddenException('Paketmu tidak termasuk tryout ini');
+    }
+    return tryout;
+  }
+
   async findOne(id: number) {
     const tryout = await this.tryoutRepo.findOne({ where: { id } });
     if (!tryout) throw new NotFoundException('Tryout tidak ditemukan');
@@ -62,9 +85,16 @@ export class TryoutsService {
   }
 
   // BUG FIX #2: create, update, remove untuk admin
+  private categoryOrThrow(category?: string) {
+    const c = normalizeCategory(category);
+    if (!c) throw new BadRequestException('Kategori harus SNBT, SKD, atau STIS');
+    return c;
+  }
+
   async create(dto: CreateTryoutDto) {
     const tryout = this.tryoutRepo.create({
       ...dto,
+      category: this.categoryOrThrow(dto.category),
       isActive: dto.isActive ?? true,
       isLocked: dto.isLocked ?? false,
     });
@@ -73,6 +103,7 @@ export class TryoutsService {
 
   async update(id: number, dto: Partial<CreateTryoutDto>) {
     await this.findOne(id); // throws 404 jika tidak ada
+    if (dto.category !== undefined) dto = { ...dto, category: this.categoryOrThrow(dto.category) };
     await this.tryoutRepo.update(id, dto);
     return this.findOne(id);
   }

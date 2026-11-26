@@ -8,13 +8,14 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AdminLayout from './AdminLayout';
 import { api, adminApi } from '../../lib/api';
+import { normalizeCategory } from '../../lib/category';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Tryout {
   id: number | string;
   title: string;
   description: string;
-  category: 'SKD' | 'SNBT' | 'PTN' | 'STIS';
+  category: 'SKD' | 'SNBT' | 'STIS';
   difficulty: 'Mudah' | 'Sedang' | 'Sulit';
   duration: number;
   totalQuestions: number;
@@ -33,13 +34,6 @@ interface TryoutForm {
   totalQuestions: number;
 }
 
-interface QuestionStat {
-  questionId: number | string;
-  questionText: string;
-  answers: Record<string, number>;
-  totalAnswers: number;
-}
-
 const EMPTY_FORM: TryoutForm = {
   title: '',
   description: '',
@@ -53,7 +47,6 @@ const EMPTY_FORM: TryoutForm = {
 const CATEGORY_COLORS: Record<string, string> = {
   SKD:  'bg-blue-100 text-blue-700',
   SNBT: 'bg-green-100 text-green-700',
-  PTN:  'bg-purple-100 text-purple-700',
   STIS: 'bg-orange-100 text-orange-700',
 };
 const getCategoryColor = (c: string) => CATEGORY_COLORS[c] || 'bg-gray-100 text-gray-600';
@@ -69,10 +62,21 @@ const getDifficultyColor = (d: string) => DIFFICULTY_COLORS[d] || 'bg-gray-100 t
 async function fetchQuestionStats(tryoutId: string) {
   const token = localStorage.getItem('access_token');
   const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
-  const res = await fetch(`${BASE_URL}/results/${tryoutId}/question-stats`, {
+  const res = await fetch(`${BASE_URL}/exam/${tryoutId}/question-stats`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error('Gagal memuat statistik');
+  return res.json();
+}
+
+async function recalculateTryout(tryoutId: string) {
+  const token = localStorage.getItem('access_token');
+  const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+  const res = await fetch(`${BASE_URL}/exam/${tryoutId}/recalculate`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error('Gagal menghitung ulang skor');
   return res.json();
 }
 
@@ -120,6 +124,20 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
   const [error, setError] = useState('');
   const [statsData, setStatsData] = useState<any[]>([]);
   const [totalParticipants, setTotalParticipants] = useState(0);
+  const [weighted, setWeighted] = useState(false);
+  const [recalcState, setRecalcState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const handleRecalculate = async () => {
+    setRecalcState('busy');
+    try {
+      await recalculateTryout(String(tryout.id));
+      setRecalcState('done');
+      setReloadKey(k => k + 1);
+    } catch {
+      setRecalcState('error');
+    }
+  };
 
   useEffect(() => {
     const loadStats = async () => {
@@ -131,40 +149,26 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
           api.getQuestions(String(tryout.id)),
         ]);
 
-        const stats: QuestionStat[] = statsRes.stats || statsRes.data || statsRes || [];
+        // Format: { participants, weighted, questions: [{questionId, subtest, correct, answered, unanswered, weight}] }
+        const stats: any[] = statsRes.questions || [];
         const questions: any[] = questionsRes.data || questionsRes || [];
-        setTotalParticipants(statsRes.totalParticipants || statsRes.total || 0);
+        const total: number = statsRes.participants || 0;
+        setTotalParticipants(total);
+        setWeighted(!!statsRes.weighted);
 
-        // Build a map of questionId → correctAnswer
-        const correctMap: Record<string, string> = {};
-        questions.forEach((q: any) => {
-          correctMap[String(q.id)] = q.correctAnswer;
-        });
-
-        // Build table data
-        const rows = stats.map((s: any, idx: number) => {
-          const qId = String(s.questionId);
-          const correctAns = correctMap[qId] || '';
-          const answers: Record<string, number> = s.answers || {};
-          const total = s.totalAnswers || Object.values(answers).reduce((a: number, b: any) => a + Number(b), 0);
-          const correct = correctAns ? (answers[correctAns] || 0) : 0;
-          const unanswered = answers[''] || answers['null'] || answers['undefined'] || 0;
-          const wrong = total - correct - unanswered;
-          const pctCorrect = total > 0 ? Math.round((correct / total) * 100) : 0;
-
-          // Find question text
-          const q = questions.find((qq: any) => String(qq.id) === qId);
-          const text = q?.questionText || s.questionText || `Soal #${idx + 1}`;
-
+        const rows = stats.map((st: any, idx: number) => {
+          const q = questions.find((qq: any) => String(qq.id) === String(st.questionId));
           return {
             no: idx + 1,
-            questionId: qId,
-            text,
-            correct,
-            wrong: wrong < 0 ? 0 : wrong,
-            unanswered,
+            questionId: String(st.questionId),
+            subtest: st.subtest as string,
+            text: (q?.questionText as string) || `Soal #${idx + 1}`,
+            correct: st.correct as number,
+            wrong: Math.max(0, (st.answered || 0) - st.correct),
+            unanswered: (st.unanswered || 0) as number,
             total,
-            pctCorrect,
+            pctCorrect: total > 0 ? Math.round((st.correct / total) * 100) : 0,
+            weight: st.weight as number | null,
           };
         });
 
@@ -181,7 +185,7 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
       }
     };
     loadStats();
-  }, [tryout.id]);
+  }, [tryout.id, reloadKey]);
 
   // Top 10 hardest for chart
   const chartData = useMemo(() =>
@@ -207,9 +211,18 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-[#2563EB]" /> Statistik: {tryout.title}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">Total Peserta: <span className="font-semibold text-gray-700">{totalParticipants}</span></p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Total Peserta (percobaan pertama): <span className="font-semibold text-gray-700">{totalParticipants}</span>
+              {weighted && <> · Skor SNBT berbobot: soal yang jarang dijawab benar (termasuk tidak diisi) bernilai lebih tinggi (bobot 1–3)</>}
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleRecalculate} disabled={recalcState === 'busy'}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-blue-200 text-[#2563EB] hover:bg-blue-50 disabled:opacity-50">
+              {recalcState === 'busy' ? 'Menghitung...' : recalcState === 'done' ? 'Skor diperbarui' : recalcState === 'error' ? 'Gagal, coba lagi' : 'Hitung Ulang Skor'}
+            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
+          </div>
         </div>
 
         {/* Content */}
@@ -266,6 +279,7 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
                         <th className="px-4 py-3 text-center font-semibold w-20">Salah</th>
                         <th className="px-4 py-3 text-center font-semibold w-24">Tidak Dijawab</th>
                         <th className="px-4 py-3 text-center font-semibold w-24">% Benar</th>
+                        {weighted && <th className="px-4 py-3 text-center font-semibold w-20">Bobot</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -273,6 +287,7 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
                         <tr key={row.questionId} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3 text-gray-500 font-medium">{row.no}</td>
                           <td className="px-4 py-3 text-gray-800 font-medium">
+                            <span className="text-[10px] font-bold text-gray-400 mr-1.5">{row.subtest}</span>
                             {row.text.length > 60 ? row.text.slice(0, 60) + '…' : row.text}
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -293,6 +308,11 @@ function StatsModal({ tryout, onClose }: { tryout: Tryout; onClose: () => void }
                               {row.pctCorrect}%
                             </span>
                           </td>
+                          {weighted && (
+                            <td className="px-4 py-3 text-center font-semibold text-gray-700">
+                              {row.weight != null ? row.weight.toFixed(2) : '—'}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -365,10 +385,9 @@ function FormModal({ editing, initial, onSave, onClose, loading }: {
                 <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
                   className="w-full appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700">
                   <option value="">-- Pilih Kategori --</option>
-                  <option value="SKD">SKD</option>
-                  <option value="SNBT">SNBT</option>
-                  <option value="PTN">PTN</option>
-                  <option value="STIS">STIS</option>
+                  <option value="SKD">SKD (TWK, TIU, TKP)</option>
+                  <option value="SNBT">SNBT (termasuk PTN)</option>
+                  <option value="STIS">STIS (tes khusus Matematika — hanya paket STIS)</option>
                 </select>
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
@@ -465,14 +484,17 @@ export default function AdminTryouts() {
           id: t.id,
           title: t.title || '',
           description: t.description || '',
-          category: t.category || 'SKD',
+          category: normalizeCategory(t.category) || 'SKD',
           difficulty: t.difficulty || 'Sedang',
           duration: t.duration || 0,
           totalQuestions: t.totalQuestions || 0,
           isActive: !!t.isActive,
           isLocked: !!t.isLocked,
           createdAt: t.createdAt || '',
-          subjects: t.subjects || [],
+          // Backend mengirim subtes sebagai objek { code, name, totalQuestions } — ubah ke label teks
+          subjects: (t.subjects || [])
+            .map((s: any) => (typeof s === 'string' ? s : s?.code || s?.name || ''))
+            .filter(Boolean),
         })));
       })
       .catch(() => setTryouts([]))
@@ -638,8 +660,7 @@ export default function AdminTryouts() {
               { value: 'all',  label: 'Semua' },
               { value: 'SKD',  label: '🏛️ SKD' },
               { value: 'SNBT', label: '🎓 SNBT' },
-              { value: 'PTN',  label: '🎯 PTN' },
-              { value: 'STIS', label: '📊 STIS' },
+              { value: 'STIS', label: '📐 STIS' },
             ].map(tab => (
               <button key={tab.value} onClick={() => setCategoryFilter(tab.value)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${categoryFilter === tab.value ? 'bg-[#2563EB] text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>

@@ -5,50 +5,12 @@ import { ExamDraft } from './exam-draft.entity';
 import { QuestionsService } from '../questions/questions.service';
 import { ResultsService } from '../results/results.service';
 import { TryoutsService } from '../tryouts/tryouts.service';
+import { ExamResult } from '../results/exam-result.entity';
+import {
+  calculateScore, computeQuestionWeights, firstAttempts, rankBestAttempts, usesWeightedScoring,
+} from './scoring';
 
-// ── BUG FIX #5: Formula skor sesuai aturan resmi ────────────────
-//
-// SKD (CPNS/Sekdin/STIS):
-//   TWK : benar +5, salah 0, kosong 0  — max 35 soal → max 175
-//   TIU : benar +5, salah 0, kosong 0  — max 35 soal → max 175
-//   TKP : skala opsi 1–5 per jawaban    — max 35 soal → max 175
-//   Total max: 550  |  Passing grade: TWK≥65, TIU≥80, TKP≥166
-//
-// SNBT/PTN (UTBK):
-//   Semua subtes: benar +1, salah 0, kosong 0
-//   Skor akhir dikonversi ke skala 0–1000
-
-interface SubScore {
-  subtest: string;
-  correct: number;
-  wrong: number;
-  unanswered: number;
-  rawScore: number;     // sebelum konversi skala
-  scaledScore: number;  // setelah konversi ke skala resmi
-  passingGrade?: number;
-  passed?: boolean;
-}
-
-interface ScoreResult {
-  subScores: SubScore[];
-  totalScore: number;
-  maxScore: number;
-  percentage: number;
-  correct: number;
-  wrong: number;
-  unanswered: number;
-  totalQuestions: number;
-  passingInfo?: {
-    TWK?: { score: number; pass: boolean; required: number };
-    TIU?: { score: number; pass: boolean; required: number };
-    TKP?: { score: number; pass: boolean; required: number };
-    allPassed: boolean;
-  };
-}
-
-// TKP — nilai tiap opsi (disesuaikan per posisi; gunakan rata-rata jika tidak diketahui)
-// Resminya tiap soal punya bobot berbeda — kita pakai 5/4/3/2/1 sebagai default
-const TKP_OPTION_SCORES: Record<string, number> = { a: 5, b: 4, c: 3, d: 2, e: 1 };
+// Formula skor ada di ./scoring.ts (SKD resmi; SNBT berbobot per soal).
 
 @Injectable()
 export class ExamService {
@@ -92,7 +54,7 @@ export class ExamService {
     subScores?: any[];
   }) {
     let tryoutTitle = 'Tryout';
-    let category = 'PTN';
+    let category = 'SNBT';
 
     try {
       const tryout = await this.tryoutsService.findOne(submission.tryoutId);
@@ -103,8 +65,8 @@ export class ExamService {
     const questions = await this.questionsService.findAllByTryout(submission.tryoutId);
     const answers   = submission.answers;
 
-    // BUG FIX #5: hitung skor dengan formula yang benar per kategori
-    const scored = this.calculateScore(questions, answers, category);
+    // Skor awal; untuk SNBT segera dihitung ulang dengan bobot terbaru di bawah
+    const scored = calculateScore(questions, answers, category);
 
     const result = await this.resultsService.createResult({
       userId,
@@ -126,149 +88,76 @@ export class ExamService {
     });
 
     await this.draftRepo.delete({ userId, tryoutId: submission.tryoutId });
-    return result;
+
+    // Hitung ulang bobot soal (SNBT) + skor & peringkat semua peserta try out ini
+    await this.recalculateTryout(submission.tryoutId);
+    return (await this.resultsService.findById(result.id)) ?? result;
   }
 
-  // ── Kalkulasi skor ─────────────────────────────────────────────
-  private calculateScore(
-    questions: any[],
-    answers: Record<string, string>,
-    category: string,
-  ): ScoreResult {
-    const cat = (category || '').toUpperCase();
-    const isSKD = cat === 'SKD' || cat === 'STIS' || cat.includes('CPNS') || cat.includes('SEKDIN');
+  /**
+   * Hitung ulang skor seluruh hasil pada satu try out.
+   * SNBT: bobot soal dari tingkat benar percobaan pertama tiap peserta (kosong = tidak benar).
+   * SKD : skor tetap (aturan resmi), hanya peringkat yang diperbarui.
+   */
+  async recalculateTryout(tryoutId: number) {
+    const [questions, results] = await Promise.all([
+      this.questionsService.findAllByTryout(tryoutId),
+      this.resultsService.findByTryout(tryoutId),
+    ]);
+    if (!results.length) return { tryoutId, results: 0, weighted: false };
 
-    // Kelompokkan soal per subtes
-    const bySubtest: Record<string, any[]> = {};
-    for (const q of questions) {
-      const key = (q.subtestCode || q.subtestName || 'UMUM').toUpperCase();
-      if (!bySubtest[key]) bySubtest[key] = [];
-      bySubtest[key].push(q);
-    }
+    const category = results[0].category;
+    const weighted = usesWeightedScoring(category);
+    const weights = weighted
+      ? computeQuestionWeights(questions, firstAttempts(results).map((r) => (r.answers || {}) as Record<string, string>))
+      : undefined;
 
-    const subScores: SubScore[] = [];
-    let totalCorrect   = 0;
-    let totalWrong     = 0;
-    let totalUnanswered = 0;
-
-    for (const [subtest, qs] of Object.entries(bySubtest)) {
-      let rawScore = 0;
-      let correct  = 0;
-      let wrong    = 0;
-      let unanswered = 0;
-
-      for (const q of qs) {
-        const userAns = (answers[q.id.toString()] || '').toLowerCase();
-        const correct_ans = (q.correctAnswer || '').toLowerCase();
-
-        if (!userAns) {
-          unanswered++;
-        } else if (isSKD && subtest === 'TKP') {
-          // FIX B2 TKP: tidak ada konsep benar/salah — semua opsi yang dipilih
-          // langsung menghasilkan skor sesuai bobotnya (a=5 b=4 c=3 d=2 e=1 default).
-          // Jika soal punya optionWeights (JSON field), gunakan itu;
-          // jika tidak, fallback ke TKP_OPTION_SCORES posisional.
-          const weights = q.optionWeights
-            ? (typeof q.optionWeights === 'string' ? JSON.parse(q.optionWeights) : q.optionWeights)
-            : TKP_OPTION_SCORES;
-          const score = weights[userAns] ?? TKP_OPTION_SCORES[userAns] ?? 3;
-          rawScore += score;
-          // Untuk TKP semua jawaban dianggap "benar" (ada nilainya)
-          correct++;
-        } else if (userAns === correct_ans) {  // TWK/TIU/SNBT: cek jawaban benar
-          correct++;
-          if (isSKD) {
-            rawScore += 5; // TWK/TIU: +5 benar
-          } else {
-            rawScore += 1; // SNBT/PTN: +1 benar
-          }
-        } else {
-          wrong++;
-          // TWK/TIU/SNBT: tidak ada pengurangan untuk jawaban salah
-        }
+    if (questions.length) {
+      for (const r of results) {
+        const s = calculateScore(questions, (r.answers || {}) as Record<string, string>, r.category, weights);
+        Object.assign(r, {
+          correct: s.correct, wrong: s.wrong, unanswered: s.unanswered, totalQuestions: s.totalQuestions,
+          totalScore: s.totalScore, maxScore: s.maxScore, percentage: s.percentage, subScores: s.subScores,
+        });
       }
-
-      totalCorrect    += correct;
-      totalWrong      += wrong;
-      totalUnanswered += unanswered;
-
-      // Scaled score
-      let scaledScore = rawScore;
-      let passingGrade: number | undefined;
-
-      if (isSKD) {
-        // SKD: skor sudah dalam skala poin langsung
-        scaledScore = rawScore;
-        if (subtest === 'TWK') passingGrade = 65;
-        if (subtest === 'TIU') passingGrade = 80;
-        if (subtest === 'TKP') passingGrade = 166;
-      } else {
-        // SNBT: konversi ke 0–1000
-        const maxRaw = qs.length;
-        scaledScore = maxRaw > 0 ? Math.round((rawScore / maxRaw) * 1000) : 0;
-      }
-
-      subScores.push({
-        subtest,
-        correct,
-        wrong,
-        unanswered,
-        rawScore,
-        scaledScore,
-        passingGrade,
-        passed: passingGrade !== undefined ? scaledScore >= passingGrade : undefined,
-      });
     }
-
-    // Hitung total
-    const totalQuestions = questions.length || Object.keys(answers).length;
-
-    let totalScore: number;
-    let maxScore: number;
-
-    if (isSKD) {
-      // SKD: jumlah semua scaled score per subtes
-      totalScore = subScores.reduce((s, ss) => s + ss.scaledScore, 0);
-      maxScore   = 550; // max resmi SKD (175 TWK + 175 TIU + 175 TKP + 25 bonus)
-    } else {
-      // FIX B2: SNBT — totalScore = rata-rata scaledScore semua subtes (bukan sum)
-      // Sehingga totalScore max = 1000, bukan 7000 (7 subtes x 1000)
-      const totalRaw = subScores.reduce((s, ss) => s + ss.scaledScore, 0);
-      totalScore = subScores.length > 0 ? Math.round(totalRaw / subScores.length) : 0;
-      maxScore   = 1000;
+    // Peringkat: percobaan terbaik tiap peserta (SKD: tie-break TKP > TIU > TWK)
+    const ranking = rankBestAttempts(results, category);
+    for (const r of results) {
+      r.rank = ranking.rankOf(r);
+      r.totalParticipants = ranking.participants;
     }
+    await this.resultsService.saveMany(results as ExamResult[]);
+    return { tryoutId, results: results.length, weighted };
+  }
 
-    const percentage = totalQuestions > 0
-      ? Math.round((totalCorrect / totalQuestions) * 100)
-      : 0;
-
-    // Passing info untuk SKD
-    let passingInfo: ScoreResult['passingInfo'];
-    if (isSKD) {
-      const twk = subScores.find(s => s.subtest === 'TWK');
-      const tiu = subScores.find(s => s.subtest === 'TIU');
-      const tkp = subScores.find(s => s.subtest === 'TKP');
-      passingInfo = {
-        TWK: twk ? { score: twk.scaledScore, pass: twk.scaledScore >= 65,  required: 65  } : undefined,
-        TIU: tiu ? { score: tiu.scaledScore, pass: tiu.scaledScore >= 80,  required: 80  } : undefined,
-        TKP: tkp ? { score: tkp.scaledScore, pass: tkp.scaledScore >= 166, required: 166 } : undefined,
-        allPassed:
-          (!twk || twk.scaledScore >= 65)  &&
-          (!tiu || tiu.scaledScore >= 80)  &&
-          (!tkp || tkp.scaledScore >= 166),
-      };
-    }
-
+  /** Statistik & bobot tiap soal (untuk admin). */
+  async questionStats(tryoutId: number) {
+    const [questions, results] = await Promise.all([
+      this.questionsService.findAllByTryout(tryoutId),
+      this.resultsService.findByTryout(tryoutId),
+    ]);
+    const attempts = firstAttempts(results).map((r) => (r.answers || {}) as Record<string, string>);
+    const weights = computeQuestionWeights(questions, attempts);
+    const weighted = usesWeightedScoring(results[0]?.category ?? (questions[0] as any)?.category);
     return {
-      subScores,
-      totalScore,
-      maxScore,
-      percentage,
-      correct:        totalCorrect,
-      wrong:          totalWrong,
-      unanswered:     totalUnanswered,
-      totalQuestions,
-      passingInfo,
+      tryoutId,
+      participants: attempts.length,
+      weighted,
+      questions: questions.map((q: any) => {
+        const w = weights.get(q.id)!;
+        const answered = attempts.filter((a) => (a[String(q.id)] || '').trim() !== '').length;
+        return {
+          questionId: q.id,
+          orderIndex: q.orderIndex,
+          subtest: (q.subtestCode || q.subtestName || 'UMUM').toUpperCase(),
+          correct: w.correct,
+          answered,
+          unanswered: attempts.length - answered,
+          correctRate: attempts.length ? w.correct / attempts.length : null, // tingkat benar sebenarnya
+          weight: weighted ? w.weight : null,
+        };
+      }),
     };
   }
 }

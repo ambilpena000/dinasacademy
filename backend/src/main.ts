@@ -5,9 +5,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
+import { assertProductionConfig } from './config/production-check';
 
 async function bootstrap() {
   try {
+    // Tolak start di production bila secret/password masih bawaan
+    assertProductionConfig();
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const config = app.get(ConfigService);
 

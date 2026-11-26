@@ -19,7 +19,14 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/seed.ts",
-    "seed:packages": "ts-node -r tsconfig-paths/register src/seed-packages.ts"
+    "seed:packages": "ts-node -r tsconfig-paths/register src/seed-packages.ts",
+    "seed:universities": "ts-node -r tsconfig-paths/register src/seed-universities.ts",
+    "rescore": "ts-node -r tsconfig-paths/register src/rescore-tryouts.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
+    "migration:run:prod": "typeorm migration:run -d dist/data-source.js",
+    "seed:admin": "ts-node -r tsconfig-paths/register src/seed-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -56,6 +63,7 @@
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdf-parse": "^1.1.5",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

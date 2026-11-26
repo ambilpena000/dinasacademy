@@ -57,7 +57,7 @@ DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=password_postgres_anda
 DB_NAME=dinasacademy
-JWT_SECRET=super_secret_jwt_key_dinas_academy_2026
+JWT_SECRET=isi_dengan_string_acak_minimal_32_karakter
 PORT=3000
 FRONTEND_URL=http://localhost:5173
 NODE_ENV=development
@@ -95,7 +95,12 @@ npm run seed
 npm run seed:packages
 
 # 4. Seed Akun Admin Default
-npx ts-node -r tsconfig-paths/register src/seed-admin.ts
+npm run seed:admin   # password acak ditampilkan sekali, atau set ADMIN_PASSWORD di .env
+
+# 5. Seed data PTN & Program Studi resmi SNBT (145 PTN, 5.140 prodi dari snpmb.id)
+#    beserta daya tampung, peminat, dan estimasi passing grade dari keketatan.
+#    Aman dijalankan ulang — passing grade yang diisi admin (manual) tidak ditimpa.
+npm run seed:universities
 ```
 
 ### 4. Jalankan Aplikasi (Development Mode)
@@ -118,8 +123,8 @@ npm run start:frontend
 Jika Anda tidak ingin menginstal PostgreSQL secara manual, Anda dapat menjalankan seluruh ekosistem (Database + Backend + Frontend) menggunakan Docker Compose:
 
 ```bash
-# 1. Siapkan file .env utama di root folder
-cp .env.example .env
+# 1. Siapkan file .env utama di root folder, lalu isi SEMUA nilainya
+cp env.example .env
 
 # 2. Build dan jalankan container di background
 docker-compose up -d --build
@@ -129,18 +134,29 @@ docker-compose logs -f backend
 ```
 * **Frontend**: http://localhost:80
 * **Backend API**: http://localhost:3000
-* **PostgreSQL**: localhost:5432
+* **PostgreSQL**: hanya dari server itu sendiri (127.0.0.1:5432)
+
+### Catatan production
+* Backend **menolak start** bila `JWT_SECRET` < 32 karakter/bawaan, `DB_PASSWORD` bawaan, atau `FRONTEND_URL` masih localhost.
+* Tabel database dibuat & diperbarui lewat **migrasi** yang berjalan otomatis saat backend start
+  (`backend/src/migrations`). Setelah mengubah entity: `npm run migration:generate -- src/migrations/NamaPerubahan`.
+* Foto profil disimpan di volume `uploads_data` sehingga aman saat update.
+* Database baru (kosong): buat admin & isi data dengan
+  `docker compose exec backend node dist/seed-admin.js` dan `docker compose exec backend node dist/seed-universities.js`.
+* Memindahkan database lokal ke server (pg_dump → pg_restore), lalu **wajib ganti password admin**:
+  `docker compose exec -e ADMIN_PASSWORD='password-baru-yang-kuat' backend node dist/seed-admin.js --reset-password`
 
 ---
 
 ## 🔑 Kredensial Login & Akun Default
 
-Setelah menjalankan script seeder (`seed-admin.ts`), Anda dapat menggunakan akun berikut untuk masuk ke sistem:
+Setelah menjalankan `npm run seed:admin`, gunakan akun berikut untuk masuk ke sistem:
 
 ### 🛡️ Akun Administrator (Dashboard Admin)
 Digunakan untuk mengelola soal, memvalidasi pembayaran paket pengguna, dan melihat statistik sistem:
-* **Email:** `admin@dinasacademy.id`
-* **Password:** `Admin123!`
+* **Email:** `admin@dinasacademy.id` (atau nilai `ADMIN_EMAIL`)
+* **Password:** ditampilkan **sekali** saat seeder dijalankan, atau sesuai `ADMIN_PASSWORD` di `.env` (min. 10 karakter).
+  Lupa password? Jalankan `npm run seed:admin -- --reset-password`.
 * **Akses:** Halaman Admin (`/admin` atau tombol panel admin di navigation bar)
 
 ### 🧑‍🎓 Akun Siswa / Student (Reguler)
@@ -203,7 +219,9 @@ Untuk memastikan seluruh fitur inti berfungsi dengan baik, lakukan skenario peng
 | `npm run build` | Root | Membuild bundle production backend & frontend |
 | `npm run seed` | `cd backend` | Mengisi data Try Out awal & butir soal simulasi |
 | `npm run seed:packages`| `cd backend` | Mengisi katalog paket langganan |
-| `npx ts-node src/seed-admin.ts` | `cd backend` | Membuat akun admin default |
+| `npm run seed:admin` | `cd backend` | Membuat akun admin (tambah `-- --reset-password` untuk ganti password) |
+| `npm run seed:universities` | `cd backend` | Sinkronisasi data PTN & prodi SNBT ke database |
+| `python scripts/sync_snpmb.py --refresh` | root | Unduh ulang data resmi snpmb.id & hitung estimasi passing grade (jalankan tiap rilis daya tampung baru, lalu seed) |
 
 ---
 

@@ -10,7 +10,7 @@ import { api, adminApi } from '../../lib/api';
 // ── Types ──────────────────────────────────────────────────────────
 interface Question {
   id: string;
-  paket: 'SKD' | 'SNBT' | '';
+  paket: 'SKD' | 'SNBT' | 'STIS' | '';
   subject: string;
   tryOutId: string;
   tryOutNumericId?: string; // actual backend id
@@ -35,9 +35,10 @@ const EMPTY_QUESTION: Question = {
 };
 
 // Map category string dari backend ke paket label
-function mapCategory(cat: string): 'SKD' | 'SNBT' | '' {
+function mapCategory(cat: string): 'SKD' | 'SNBT' | 'STIS' | '' {
   const c = (cat || '').toUpperCase();
-  if (c.includes('SKD') || c.includes('CPNS') || c.includes('SEKDIN') || c.includes('STIS')) return 'SKD';
+  if (c.includes('STIS') || c.includes('POLSTAT')) return 'STIS';
+  if (c.includes('SKD') || c.includes('CPNS') || c.includes('SEKDIN')) return 'SKD';
   if (c.includes('SNBT') || c.includes('PTN') || c.includes('SBMPTN')) return 'SNBT';
   return '';
 }
@@ -59,6 +60,7 @@ const getSubjectColor = (s: string) => SUBJECT_COLORS[s] || 'bg-gray-100 text-gr
 const PAKET_COLOR: Record<string, string> = {
   SKD: 'bg-blue-600 text-white',
   SNBT: 'bg-green-600 text-white',
+  STIS: 'bg-orange-500 text-white',
 };
 
 // ── Delete Confirm Modal ───────────────────────────────────────────
@@ -95,7 +97,7 @@ export default function AdminQuestions() {
 
   // Filter states
   const [search, setSearch] = useState('');
-  const [paketFilter, setPaketFilter] = useState<'all' | 'SKD' | 'SNBT'>('all');
+  const [paketFilter, setPaketFilter] = useState<'all' | 'SKD' | 'SNBT' | 'STIS'>('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [tryOutFilter, setTryOutFilter] = useState('all');
 
@@ -278,6 +280,7 @@ export default function AdminQuestions() {
   // Stats
   const skdCount = questions.filter(q => q.paket === 'SKD').length;
   const snbtCount = questions.filter(q => q.paket === 'SNBT').length;
+  const stisCount = questions.filter(q => q.paket === 'STIS').length;
   const tryOutCount = new Set(questions.map(q => q.tryOutId).filter(Boolean)).size;
 
   return (
@@ -339,8 +342,9 @@ export default function AdminQuestions() {
                       <select value={form.paket} onChange={e => setForm({ ...form, paket: e.target.value as any, tryOutId: '', tryOutNumericId: '' })}
                         className="w-full appearance-none pl-4 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white font-medium text-gray-700">
                         <option value="">-- Pilih Paket --</option>
-                        <option value="SKD">SKD (CPNS/Sekdin/STIS)</option>
+                        <option value="SKD">SKD (TWK/TIU/TKP)</option>
                         <option value="SNBT">SNBT (PTN/Universitas)</option>
+                        <option value="STIS">STIS (tes khusus Matematika)</option>
                       </select>
                       <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
@@ -369,12 +373,12 @@ export default function AdminQuestions() {
                 <div>
                   <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Mata Pelajaran / Subtes *</label>
                   <input type="text" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
-                    placeholder={form.paket === 'SKD' ? 'TWK / TIU / TKP' : form.paket === 'SNBT' ? 'Matematika / Penalaran Umum / Bahasa Indonesia / dll' : 'Mata pelajaran...'}
+                    placeholder={form.paket === 'SKD' ? 'TWK / TIU / TKP' : form.paket === 'STIS' ? 'MTK' : form.paket === 'SNBT' ? 'Matematika / Penalaran Umum / Bahasa Indonesia / dll' : 'Mata pelajaran...'}
                     className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
                   {/* Quick pick subject */}
                   {form.paket && (
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      {(form.paket === 'SKD' ? ['TWK', 'TIU', 'TKP'] : ['Matematika', 'Penalaran Umum', 'Bahasa Indonesia', 'Bahasa Inggris', 'Literasi', 'Kuantitatif']).map(s => (
+                      {(form.paket === 'SKD' ? ['TWK', 'TIU', 'TKP'] : form.paket === 'STIS' ? ['MTK'] : ['Matematika', 'Penalaran Umum', 'Bahasa Indonesia', 'Bahasa Inggris', 'Literasi', 'Kuantitatif']).map(s => (
                         <button key={s} type="button"
                           onClick={() => setForm({ ...form, subject: s })}
                           className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${form.subject === s ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-[#2563EB] hover:text-[#2563EB]'}`}>
@@ -455,11 +459,12 @@ export default function AdminQuestions() {
         </AnimatePresence>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {[
             { label: 'Total Soal',    value: questions.length,  color: 'text-blue-600',   bg: 'bg-blue-50' },
             { label: 'Soal SKD',      value: skdCount,          color: 'text-indigo-600', bg: 'bg-indigo-50' },
             { label: 'Soal SNBT',     value: snbtCount,         color: 'text-green-600',  bg: 'bg-green-50' },
+            { label: 'Soal STIS',     value: stisCount,         color: 'text-orange-600', bg: 'bg-orange-50' },
             { label: 'Try Out',       value: tryOutCount,       color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map(s => (
             <div key={s.label} className={`${s.bg} rounded-2xl p-4 text-center border border-white`}>
@@ -481,6 +486,7 @@ export default function AdminQuestions() {
               { value: 'all', label: 'Semua Paket' },
               { value: 'SKD', label: '🏛️ SKD' },
               { value: 'SNBT', label: '🎓 SNBT' },
+              { value: 'STIS', label: '📐 STIS' },
             ].map(tab => (
               <button key={tab.value} onClick={() => { setPaketFilter(tab.value as any); setTryOutFilter('all'); setSubjectFilter('all'); }}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${paketFilter === tab.value ? 'bg-[#2563EB] text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>

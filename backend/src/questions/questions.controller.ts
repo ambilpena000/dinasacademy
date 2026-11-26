@@ -1,22 +1,30 @@
 import {
   Controller, Get, Post, Put, Delete,
   Body, Param, Query, UseGuards, UseInterceptors,
-  UploadedFile, Request, ForbiddenException,
+  UploadedFile, Request, ForbiddenException, ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { QuestionsService } from './questions.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TryoutsService } from '../tryouts/tryouts.service';
+import { ResultsService } from '../results/results.service';
 
 @Controller('questions')
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(
+    private readonly questionsService: QuestionsService,
+    private readonly tryoutsService: TryoutsService,
+    private readonly resultsService: ResultsService,
+  ) {}
 
   // GET /questions/tryout/:tryoutId — soal per tryout (untuk exam, tanpa paginasi)
   @Get('tryout/:tryoutId')
   @UseGuards(JwtAuthGuard)
-  async findByTryout(@Param('tryoutId') tryoutId: string) {
-    const questions = await this.questionsService.findAllByTryout(parseInt(tryoutId));
+  async findByTryout(@Param('tryoutId', ParseIntPipe) tryoutId: number, @Request() req: any) {
+    // Hanya peserta yang paketnya mencakup try out ini (atau admin)
+    await this.tryoutsService.assertAccess(req.user, tryoutId);
+    const questions = await this.questionsService.findAllByTryout(tryoutId);
     // Keamanan: strip correctAnswer & explanation agar user tidak bisa curang saat ujian.
     // optionWeights TETAP dikirim karena dibutuhkan untuk tampilan soal TKP di frontend.
     return questions.map(({ correctAnswer: _c, explanation: _e, ...rest }) => rest);
@@ -25,9 +33,13 @@ export class QuestionsController {
   // FIX B1: endpoint pembahasan — include correctAnswer + explanation setelah ujian selesai
   @Get('tryout/:tryoutId/pembahasan')
   @UseGuards(JwtAuthGuard)
-  findByTryoutWithAnswers(@Param('tryoutId') tryoutId: string) {
-    // correctAnswer dan explanation dikirim untuk halaman pembahasan
-    return this.questionsService.findAllByTryout(parseInt(tryoutId));
+  async findByTryoutWithAnswers(@Param('tryoutId', ParseIntPipe) tryoutId: number, @Request() req: any) {
+    // Kunci jawaban hanya untuk admin atau peserta yang SUDAH menyelesaikan try out ini
+    if (req.user?.role !== 'admin') {
+      const done = await this.resultsService.getResultByTryout(req.user.id, tryoutId);
+      if (!done) throw new ForbiddenException('Pembahasan tersedia setelah kamu menyelesaikan try out ini');
+    }
+    return this.questionsService.findAllByTryout(tryoutId);
   }
 
   // POST /questions/upload — import JSON atau PDF (admin only)
@@ -43,10 +55,13 @@ export class QuestionsController {
   @Get()
   @UseGuards(JwtAuthGuard)
   findAll(
+    @Request() req: any,
     @Query('tryoutId') tryoutId?: string,
     @Query('page')     page     = '1',
     @Query('limit')    limit    = '50',
   ) {
+    // Bank soal lengkap (termasuk kunci jawaban) — admin saja
+    if (req.user?.role !== 'admin') throw new ForbiddenException('Admin only');
     return this.questionsService.findAll(
       tryoutId ? parseInt(tryoutId) : undefined,
       parseInt(page),
@@ -56,7 +71,8 @@ export class QuestionsController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  findOne(@Param('id') id: string) {
+  findOne(@Request() req: any, @Param('id') id: string) {
+    if (req.user?.role !== 'admin') throw new ForbiddenException('Admin only');
     return this.questionsService.findOne(parseInt(id));
   }
 

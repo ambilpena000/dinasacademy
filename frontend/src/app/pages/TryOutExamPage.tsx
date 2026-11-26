@@ -8,6 +8,7 @@ import {
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
 import { api } from '../lib/api';
+import { normalizeCategory } from '../lib/category';
 
 // ── Subtes SNBT 2026 (urutan & durasi sesuai regulasi) ────────────
 const SNBT_SUBTESTS = [
@@ -26,10 +27,9 @@ const SKD_SUBTESTS = [
   { code: 'TKP', name: 'Tes Karakteristik Pribadi', duration: 41, totalQ: 45 },
 ];
 
+// Tes khusus STIS (hanya paket STIS). Soal di Bank Soal diberi subtes "MTK".
 const STIS_SUBTESTS = [
-  { code: 'MTK', name: 'Matematika',        duration: 60, totalQ: 50 },
-  { code: 'ENG', name: 'Bahasa Inggris',    duration: 40, totalQ: 30 },
-  { code: 'PU',  name: 'Pengetahuan Umum', duration: 20, totalQ: 20 },
+  { code: 'MTK', name: 'Tes Matematika STIS', duration: 60, totalQ: 50 },
 ];
 
 type SubtestCfg = { code: string; name: string; duration: number; totalQ: number };
@@ -135,9 +135,10 @@ export default function TryOutExamPage() {
 
   const subtests: SubtestCfg[] = React.useMemo(() => {
     if (!tryOut) return [];
-    if (tryOut.category === 'PTN' || tryOut.category === 'SNBT') return SNBT_SUBTESTS;
-    if (tryOut.category === 'SKD') return SKD_SUBTESTS;
-    return STIS_SUBTESTS;
+    const cat = normalizeCategory(tryOut.category); // PTN (lama) = SNBT
+    if (cat === 'SKD') return SKD_SUBTESTS;
+    if (cat === 'STIS') return STIS_SUBTESTS;
+    return SNBT_SUBTESTS;
   }, [tryOut]);
 
   // ── Load saved state ──────────────────────────────────────────
@@ -329,7 +330,7 @@ export default function TryOutExamPage() {
     const result = {
       tryOutId: id,
       tryOutTitle: tryOut?.title || 'Try Out',
-      category: tryOut?.category || 'PTN',
+      category: normalizeCategory(tryOut?.category) || 'SNBT',
       answers,
       correct:        backendResult?.correct        ?? 0,
       wrong:          backendResult?.wrong          ?? 0,

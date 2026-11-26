@@ -215,7 +215,6 @@ export default function LockedStatePage({ feature }: LockedStatePageProps) {
                 'Try Out CAT dengan sistem scoring otomatis',
                 'Pembahasan detail dengan tips & trik',
                 'Tracking progress dan analisis mendalam',
-                'Akses grup mentoring dengan alumni PTN/Sekdin',
                 'Update materi dan soal terbaru',
               ].map((benefit, idx) => (
                 <div key={idx} className="flex items-start">

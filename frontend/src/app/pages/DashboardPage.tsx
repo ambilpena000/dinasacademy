@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTryouts } from '../hooks/useTryouts';
 import { useResults } from '../hooks/useResults';
 import { api } from '../lib/api';
+import { normalizeCategory, categoriesForPackage, categoryBadgeClass } from '../lib/category';
 
 export default function DashboardPage() {
   const { user: authUser, refreshUser } = useAuth();
@@ -48,18 +49,13 @@ export default function DashboardPage() {
 
   // Filter tryout sesuai kategori paket
   const allowedCategories = React.useMemo((): string[] => {
-    if (!authUser?.hasPurchasedPackage || !authUser?.packageType) return [];
-    const pkg = (authUser.packageType || '').toLowerCase();
-    if (pkg.includes('combo') || pkg.includes('lengkap')) return ['PTN', 'SKD', 'STIS'];
-    if (pkg.includes('ptn') || pkg.includes('snbt')) return ['PTN'];
-    if (pkg.includes('stis')) return ['STIS', 'SKD'];
-    if (pkg.includes('skd') || pkg.includes('sekdin')) return ['SKD'];
-    return [];
+    if (!authUser?.hasPurchasedPackage) return [];
+    return categoriesForPackage(authUser.packageType);
   }, [authUser]);
 
   const mergedTryOuts = React.useMemo(() => {
     return backendTryouts
-      .filter(t => allowedCategories.includes(t.category))
+      .filter(t => allowedCategories.includes(normalizeCategory(t.category) ?? ''))
       .slice(0, maxTryouts)
       .map(t => ({
         ...t,
@@ -318,12 +314,8 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-semibold text-gray-900 mb-1">{tryOut.title}</p>
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-md font-semibold ${
-                        tryOut.category === 'PTN' ? 'bg-blue-50 text-blue-700' :
-                        tryOut.category === 'SKD' ? 'bg-violet-50 text-violet-700' :
-                        'bg-sky-50 text-sky-700'
-                      }`}>
-                        {tryOut.category}
+                      <span className={`text-xs px-2 py-0.5 rounded-md font-semibold ${categoryBadgeClass(tryOut.category)}`}>
+                        {normalizeCategory(tryOut.category) ?? tryOut.category}
                       </span>
                       <span className="text-sm text-gray-400 flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />{tryOut.duration} menit

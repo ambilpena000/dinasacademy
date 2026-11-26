@@ -6,11 +6,15 @@ import { QuestionsService } from './questions.service';
 import { QuestionsController } from './questions.controller';
 import { Question } from './question.entity';
 import { Tryout } from '../tryouts/tryout.entity';
+import { TryoutsModule } from '../tryouts/tryouts.module';
+import { ResultsModule } from '../results/results.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Question, Tryout]),
     MulterModule.register({ dest: './uploads' }),
+    TryoutsModule,
+    ResultsModule,
   ],
   providers: [QuestionsService],
   controllers: [QuestionsController],

@@ -35,6 +35,8 @@ DROP TABLE IF EXISTS tryout        CASCADE;
 DROP TABLE IF EXISTS users         CASCADE;
 DROP TABLE IF EXISTS "user"        CASCADE;
 DROP TABLE IF EXISTS user          CASCADE;
+DROP TABLE IF EXISTS major         CASCADE;
+DROP TABLE IF EXISTS university    CASCADE;
 
 
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +175,46 @@ CREATE TABLE "exam_result" (
   "createdAt"         TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- 8. Tabel: university
+-- Master Perguruan Tinggi Negeri peserta SNBT. id = ID PTN resmi SNPMB (contoh: 321 = UI).
+-- Data: python scripts/sync_snpmb.py  lalu  cd backend && npm run seed:universities
+CREATE TABLE "university" (
+  id            INTEGER PRIMARY KEY,
+  name          VARCHAR NOT NULL,
+  "shortName"   VARCHAR,
+  province      VARCHAR,
+  city          VARCHAR,
+  kategori      VARCHAR(10) NOT NULL DEFAULT 'Akademik',  -- Akademik | Vokasi | PTKIN
+  "isPtnBh"     BOOLEAN NOT NULL DEFAULT FALSE,
+  website       VARCHAR,
+  "isActive"    BOOLEAN NOT NULL DEFAULT TRUE,
+  source        VARCHAR(10) NOT NULL DEFAULT 'manual',   -- snpmb | manual
+  "createdAt"   TIMESTAMP NOT NULL DEFAULT NOW(),
+  "updatedAt"   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- 9. Tabel: major
+-- Program studi SNBT per PTN. id = ID Prodi resmi SNPMB (contoh: 321001).
+-- passingGrade = estimasi skor SNBT (0–1000), BUKAN angka resmi:
+--   'estimasi' dihitung dari keketatan SNPMB (diperbarui tiap seed), 'manual' diisi admin.
+CREATE TABLE "major" (
+  id                    INTEGER PRIMARY KEY,
+  "universityId"        INTEGER NOT NULL REFERENCES "university"(id) ON DELETE CASCADE,
+  name                  VARCHAR NOT NULL,
+  jenjang               VARCHAR(4) NOT NULL DEFAULT 'S1',   -- S1 | D3 | D4
+  peminatan             VARCHAR(10),                         -- SAINTEK | SOSHUM | NULL
+  "dayaTampung"         INTEGER,                             -- daya tampung SNBT tahun berjalan
+  peminat               INTEGER,                             -- peminat tahun terakhir
+  "peminatTahun"        INTEGER,
+  portofolio            VARCHAR,                             -- jenis portofolio (seni/olahraga)
+  "passingGrade"        INTEGER,
+  "passingGradeSource"  VARCHAR(10),                         -- estimasi | manual
+  "isActive"            BOOLEAN NOT NULL DEFAULT TRUE,
+  source                VARCHAR(10) NOT NULL DEFAULT 'manual',
+  "createdAt"           TIMESTAMP NOT NULL DEFAULT NOW(),
+  "updatedAt"           TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- STEP 4: CREATE INDEXES FOR PERFORMANCE OPTIMIZATION
@@ -184,6 +226,7 @@ CREATE INDEX IF NOT EXISTS "idx_exam_draft_userId"        ON "exam_draft"("userI
 CREATE INDEX IF NOT EXISTS "idx_exam_draft_tryoutId"      ON "exam_draft"("tryoutId");
 CREATE INDEX IF NOT EXISTS "idx_exam_result_userId"       ON "exam_result"("userId");
 CREATE INDEX IF NOT EXISTS "idx_exam_result_tryoutId"     ON "exam_result"("tryoutId");
+CREATE INDEX IF NOT EXISTS "idx_major_universityId"       ON "major"("universityId");
 
 
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -199,11 +242,13 @@ WHERE table_schema = 'public'
   AND table_type = 'BASE TABLE'
 ORDER BY table_name;
 
--- Hasil yang diharapkan: 7 tabel
+-- Hasil yang diharapkan: 9 tabel
 -- 1. exam_draft
 -- 2. exam_result
 -- 3. order
--- 4. package
--- 5. question
--- 6. tryout
--- 7. user
+-- 4. major
+-- 5. package
+-- 6. question
+-- 7. tryout
+-- 8. university
+-- 9. user

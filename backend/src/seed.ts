@@ -47,7 +47,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #1',
     description: 'Simulasi lengkap SNBT 2026 — TPS, Literasi, dan Penalaran Matematika',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Sedang',
     duration: 195,
     totalQuestions: 160,
@@ -58,7 +58,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #2',
     description: 'Simulasi SNBT level advance dengan soal prediktif 2026',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Sulit',
     duration: 195,
     totalQuestions: 160,
@@ -69,7 +69,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #3',
     description: 'Latihan intensif untuk membangun fondasi SNBT 2026',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Mudah',
     duration: 195,
     totalQuestions: 160,
@@ -80,7 +80,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #4',
     description: 'Simulasi pemantapan materi TPS & Literasi SNBT 2026',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Sedang',
     duration: 195,
     totalQuestions: 160,
@@ -91,7 +91,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #5',
     description: 'Simulasi prediksi akurat UTBK SNBT 2026',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Sulit',
     duration: 195,
     totalQuestions: 160,
@@ -102,7 +102,7 @@ const TRYOUTS: TryoutSeed[] = [
   {
     title: 'Try Out SNBT 2026 #6',
     description: 'Try Out final jelang pelaksanaan UTBK SNBT 2026',
-    category: 'PTN',
+    category: 'SNBT',
     difficulty: 'Sedang',
     duration: 195,
     totalQuestions: 160,

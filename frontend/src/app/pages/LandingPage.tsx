@@ -1,16 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
-import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
 import { 
-  BookOpen, Trophy, Target, Users, CheckCircle, 
+  BookOpen, Trophy, Target, CheckCircle, 
   ArrowRight, Star, Play, TrendingUp, Award, 
   Zap, Clock, Brain, Sparkles,
   Shield, Rocket, Crown, Heart, Gift, MessageCircle,
   Check, Video, FileText, BarChart, GraduationCap,
-  Quote, Flame, TrendingDown, ArrowDown, CheckCircle2,
+  Flame, TrendingDown, ArrowDown, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import DraggableWA from '../components/DraggableWA';
@@ -21,7 +18,6 @@ import { api } from '../lib/api';
 
 
 export default function LandingPage() {
-  const sliderRef = useRef<any>(null);
   const [packages, setPackages] = useState<any[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
 
@@ -49,80 +45,6 @@ export default function LandingPage() {
       .finally(() => setPackagesLoading(false));
   }, []);
 
-  const testimonials = [
-    {
-      name: 'Andi Setiawan',
-      university: 'Universitas Indonesia',
-      major: 'Teknik Informatika',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Try out CAT-nya mirip banget sama ujian asli! Dari awalnya ragu, sekarang Alhamdulillah bisa lolos UI.',
-      rating: 5,
-      score: '687',
-      maxScore: '800',
-      improvement: '+287 poin',
-      year: '2025'
-    },
-    {
-      name: 'Siti Rahma',
-      university: 'STAN',
-      major: 'Akuntansi',
-      image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Pembahasannya detail banget! Try out-nya bikin saya terbiasa dengan sistem CAT dan timer ketat.',
-      rating: 5,
-      score: '445',
-      maxScore: '550',
-      improvement: '+152 poin',
-      year: '2025'
-    },
-    {
-      name: 'Budi Santoso',
-      university: 'ITB',
-      major: 'Teknik Elektro',
-      image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Dari nilai try out 300-an naik jadi 600-an dalam 3 bulan! Sistem latihan soal-nya super membantu.',
-      rating: 5,
-      score: '612',
-      maxScore: '800',
-      improvement: '+309 poin',
-      year: '2025'
-    },
-    {
-      name: 'Dewi Kusuma',
-      university: 'UGM',
-      major: 'Kedokteran',
-      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Platform terbaik untuk persiapan UTBK! Try out-nya banyak, pembahasan soal sangat detail.',
-      rating: 5,
-      score: '723',
-      maxScore: '800',
-      improvement: '+245 poin',
-      year: '2025'
-    },
-    {
-      name: 'Farhan Ahmad',
-      university: 'IPDN',
-      major: 'Manajemen Pemerintahan',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Sistem CAT-nya realistis banget, pas ujian beneran jadi gak gugup. Try out rutin dan pembahasannya lengkap.',
-      rating: 5,
-      score: '534',
-      maxScore: '600',
-      improvement: '+189 poin',
-      year: '2024'
-    },
-    {
-      name: 'Ayu Lestari',
-      university: 'STIS',
-      major: 'Statistika',
-      image: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop&crop=face',
-      testimonial: 'Dashboard analytics-nya keren banget! Langsung tahu di subtes mana harus fokus belajar. Try out-nya persis CAT asli.',
-      rating: 5,
-      score: '478',
-      maxScore: '550',
-      improvement: '+234 poin',
-      year: '2024'
-    },
-  ];
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -279,26 +201,6 @@ export default function LandingPage() {
                 </motion.div>
               </div>
 
-              {/* Stats */}
-              <div className="flex flex-wrap items-center gap-6">
-                {[
-                  { value: '12K+', label: 'Siswa Berhasil' },
-                  { value: '95%', label: 'Tingkat Kelulusan' },
-                  { value: '4.9/5', label: 'Rating Siswa' },
-                ].map((stat, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + idx * 0.1 }}
-                  >
-                    <div className="text-3xl font-black bg-gradient-to-r from-blue-600 to-sky-600 bg-clip-text text-transparent">
-                      {stat.value}
-                    </div>
-                    <div className="text-sm text-gray-600 font-semibold">{stat.label}</div>
-                  </motion.div>
-                ))}
-              </div>
             </motion.div>
 
             {/* Right Image - Clean without floating elements */}
@@ -375,7 +277,7 @@ export default function LandingPage() {
               {
                 icon: Trophy,
                 title: 'Ranking Nasional',
-                description: 'Lihat peringkatmu dibanding ribuan peserta lain secara real-time',
+                description: 'Lihat peringkatmu dibanding peserta lain secara real-time',
                 gradient: 'from-blue-500 to-sky-600',
                 bgColor: 'bg-blue-500'
               },
@@ -533,183 +435,12 @@ export default function LandingPage() {
                         </motion.div>
                       </Link>
 
-                      {/* Social Proof */}
-                      <div className="mt-3 text-center">
-                        <div className="flex items-center justify-center space-x-0.5 mb-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star key={star} className="w-3 h-3 text-yellow-400 fill-current" />
-                          ))}
-                        </div>
-                        <p className="text-xs text-gray-600">
-                          <span className="font-bold text-gray-900">{2000 + (index * 300)}+</span> siswa
-                        </p>
-                      </div>
                     </div>
                   </div>
                 </motion.div>
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Testimonials Section - Clean & Professional */}
-      <section id="testimonials" className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-blue-50/20 to-white relative overflow-hidden">
-        {/* Enhanced background decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-200/30 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-sky-200/30 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-blue-100/10 via-sky-100/10 to-blue-100/10 rounded-full blur-3xl"></div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl lg:text-5xl font-black text-gray-900 mb-4">
-              Mereka Berhasil, Kamu Juga Bisa! ✨
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Ribuan siswa telah meraih mimpinya bersama DINAS ACADEMY
-            </p>
-          </motion.div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16 max-w-5xl mx-auto">
-            {[
-              { icon: Users, value: '12K+', label: 'Alumni Berhasil', color: 'from-blue-500 to-cyan-500' },
-              { icon: Trophy, value: '95%', label: 'Tingkat Lulus', color: 'from-blue-500 to-sky-500' },
-              { icon: Star, value: '4.9/5', label: 'Rating Siswa', color: 'from-amber-500 to-orange-500' },
-              { icon: Rocket, value: '1000+', label: 'Bank Soal', color: 'from-pink-500 to-rose-500' },
-            ].map((stat, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="text-center bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow"
-              >
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mx-auto mb-3`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-3xl font-black text-gray-900 mb-1">{stat.value}</div>
-                <div className="text-sm text-gray-600 font-medium">{stat.label}</div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Testimonials Carousel */}
-          <div className="relative max-w-6xl mx-auto">
-            <Slider
-              ref={sliderRef}
-              dots={true}
-              infinite={true}
-              speed={1200}
-              slidesToShow={3}
-              slidesToScroll={1}
-              autoplay={true}
-              autoplaySpeed={4000}
-              pauseOnHover={true}
-              cssEase="ease-in-out"
-              arrows={false}
-              responsive={[
-                {
-                  breakpoint: 1024,
-                  settings: {
-                    slidesToShow: 2,
-                    slidesToScroll: 1,
-                  }
-                },
-                {
-                  breakpoint: 640,
-                  settings: {
-                    slidesToShow: 1,
-                    slidesToScroll: 1,
-                  }
-                }
-              ]}
-              dotsClass="slick-dots !bottom-[-50px]"
-              customPaging={() => (
-                <div className="w-3 h-3 rounded-full bg-gray-300 hover:bg-blue-500 transition-colors cursor-pointer mt-8"></div>
-              )}
-            >
-              {testimonials.map((testimonial, idx) => (
-                <div key={idx} className="px-3">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="bg-white rounded-3xl p-8 shadow-lg hover:shadow-xl transition-shadow h-full"
-                  >
-                    {/* Header with Avatar */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <img 
-                        src={testimonial.image} 
-                        alt={testimonial.name} 
-                        className="w-16 h-16 rounded-2xl ring-4 ring-blue-100 object-cover" 
-                      />
-                      <div className="flex-1">
-                        <div className="text-lg font-black text-gray-900">{testimonial.name}</div>
-                        <div className="text-sm font-bold text-blue-600">{testimonial.university}</div>
-                        <div className="text-xs text-gray-600 mt-0.5">{testimonial.major}</div>
-                      </div>
-                    </div>
-
-                    {/* Stars */}
-                    <div className="flex gap-1 mb-4">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-4 h-4 text-amber-400 fill-current" />
-                      ))}
-                    </div>
-
-                    {/* Testimonial */}
-                    <p className="text-gray-700 text-sm leading-relaxed mb-6 line-clamp-4">
-                      "{testimonial.testimonial}"
-                    </p>
-
-                    {/* Score Badge */}
-                    <div className="bg-gradient-to-r from-blue-50 to-sky-50 rounded-2xl p-4 border border-blue-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-700">Skor Akhir</span>
-                        <span className="text-xl font-black bg-gradient-to-r from-blue-600 to-sky-600 bg-clip-text text-transparent">
-                          {testimonial.score}/{testimonial.maxScore}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">{testimonial.year}</span>
-                        <div className="bg-gradient-to-r from-green-100 to-emerald-100 px-3 py-1 rounded-full">
-                          <span className="text-xs font-black text-green-700">{testimonial.improvement}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-              ))}
-            </Slider>
-
-
-          </div>
-
-          {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mt-20"
-          >
-            <Link to="/register">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button size="lg" className="bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] shadow-lg text-lg font-black px-10 py-6">
-                  Bergabung dengan 12K+ Siswa Lainnya
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </motion.div>
-            </Link>
-          </motion.div>
         </div>
       </section>
 

@@ -13,7 +13,10 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 
 import { useResults } from '../hooks/useResults';
-import { universities, getPrograms, getPassingGradeStatus, PASSING_GRADE_DISCLAIMER } from '../data/universities';
+import { getPassingGradeStatus, PASSING_GRADE_DISCLAIMER } from '../data/universities';
+import { useUniversities, useMajors, findUniversity, findMajor, majorLabel, keketatan } from '../lib/ptn';
+import { normalizeCategory } from '../lib/category';
+import { SkdRankCard } from '../components/SkdRankCard';
 
 export default function HasilPage() {
   const { results: backendResults, loading: resultsLoading } = useResults();
@@ -81,11 +84,19 @@ export default function HasilPage() {
     .slice(0, 2);
 
 
-  const latestScore = latestResult?.totalScore || 0;
-  const highestScore = realResults.length > 0
-    ? Math.max(...realResults.map((r: any) => r.totalScore || 0))
-    : latestScore;
-  const highestScoreResult = realResults.find((r: any) => r.totalScore === highestScore);
+  // Perbandingan passing grade hanya memakai hasil try out SNBT (skala 0–1000),
+  // bukan SKD/STIS (skala 550) yang tidak sebanding.
+  const snbtResults = React.useMemo(() => realResults.filter((r: any) => {
+    const cat = String(r.category || '').toUpperCase();
+    const isSKD = cat === 'SKD' || cat === 'STIS' || cat.includes('CPNS') || cat.includes('SEKDIN');
+    return !isSKD && (r.maxScore == null || Number(r.maxScore) === 1000);
+  }), [realResults]);
+  const hasSnbtResult = snbtResults.length > 0;
+  const latestScore = snbtResults[0]?.totalScore || 0; // hasil diurutkan terbaru dulu
+  const highestScore = hasSnbtResult
+    ? Math.max(...snbtResults.map((r: any) => r.totalScore || 0))
+    : 0;
+  const highestScoreResult = snbtResults.find((r: any) => r.totalScore === highestScore);
   const [historyPage, setHistoryPage] = React.useState(1);
   const ITEMS_PER_PAGE = 3;
   const totalPages = Math.ceil(realResults.length / ITEMS_PER_PAGE);
@@ -96,19 +107,38 @@ export default function HasilPage() {
     const raw = localStorage.getItem('user');
     if (!raw) return null;
     const u = JSON.parse(raw);
-    return { university: u.targetUniversity || '', major: u.targetMajor || '', type: u.targetType || 'PTN' };
+    return { id: u.id, university: u.targetUniversity || '', major: u.targetMajor || '', type: u.targetType || 'PTN' };
   }, []);
 
+  // Try out SKD terakhir yang dikerjakan → tampilkan peringkat SKD (hasil diurutkan terbaru dulu)
+  const latestSkdResult = React.useMemo(
+    () => realResults.find((r: any) => normalizeCategory(r.category) === 'SKD'),
+    [realResults],
+  );
+
   // Cari data passing grade prodi target
+  const { universities, loading: uniLoading } = useUniversities();
+  const targetUni = findUniversity(universities, userTargetUniv?.university);
+  const { majors: targetMajors, loading: majorsLoading } = useMajors(targetUni?.id);
   const targetProgram = React.useMemo(() => {
-    if (!userTargetUniv?.university) return null;
-    const uni = universities.find((u: any) =>
-      u.name === userTargetUniv.university || u.short === userTargetUniv.university
-    );
-    if (!uni) return null;
-    const prog = uni.programs.find((p: any) => p.name === userTargetUniv.major);
-    return prog ? { ...prog, uniName: uni.name, uniShort: uni.short, location: uni.location } : null;
-  }, [userTargetUniv]);
+    if (!targetUni) return null;
+    const m = findMajor(targetMajors, userTargetUniv?.major);
+    if (!m) return null;
+    return {
+      name: majorLabel(m),
+      uniName: targetUni.name,
+      uniShort: targetUni.shortName || targetUni.name,
+      province: targetUni.province,
+      peminatan: m.peminatan,
+      passingGrade: m.passingGrade,
+      passingGradeSource: m.passingGradeSource,
+      dayaTampung: m.dayaTampung,
+      peminat: m.peminat,
+      peminatTahun: m.peminatTahun,
+      keketatan: keketatan(m),
+    };
+  }, [targetUni, targetMajors, userTargetUniv]);
+  const targetLoading = uniLoading || majorsLoading;
 
   return (
     <div className="space-y-6 pb-8">
@@ -243,6 +273,17 @@ export default function HasilPage() {
         </Card>
       </div>}
 
+      {/* Peringkat SKD (peserta yang sudah mengerjakan try out SKD) */}
+      {latestSkdResult && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+          <SkdRankCard
+            tryoutId={latestSkdResult.tryOutId}
+            tryoutTitle={latestSkdResult.tryOutTitle}
+            userId={userTargetUniv?.id}
+          />
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -258,9 +299,12 @@ export default function HasilPage() {
                 </div>
                 <div>
                   <CardTitle>Status Kelulusan Prodi Target</CardTitle>
+                  {!hasSnbtResult ? (
+                    <p className="text-sm text-gray-500 mt-1">Belum ada hasil try out SNBT</p>
+                  ) : (
                   <div className="flex items-center gap-4 mt-1 flex-wrap">
                     <p className="text-sm text-gray-500">
-                      Skor terakhir: <span className="font-bold text-blue-600">{latestScore}</span>
+                      Skor SNBT terakhir: <span className="font-bold text-blue-600">{latestScore}</span>
                       <span className="text-gray-400">/1000</span>
                     </p>
                     <p className="text-sm text-gray-400">·</p>
@@ -274,13 +318,23 @@ export default function HasilPage() {
                       )}
                     </p>
                   </div>
+                  )}
+                  {hasSnbtResult && (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Skor SNBT dihitung dengan bobot per soal: soal yang jarang dijawab benar bernilai lebih tinggi,
+                      sehingga skor dapat berubah seiring bertambahnya peserta.
+                    </p>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {targetProgram ? (
+              {targetLoading ? (
+                <div className="text-center py-8 text-sm text-gray-400">Memuat data program studi...</div>
+              ) : targetProgram ? (
                 (() => {
-                  const status = getPassingGradeStatus(latestScore, targetProgram.estimatedPassingGrade || 650);
+                  const pg = targetProgram.passingGrade;
+                  const status = pg != null && hasSnbtResult ? getPassingGradeStatus(latestScore, pg) : null;
                   return (
                     <div className="space-y-4">
                       {/* Target prodi info */}
@@ -288,15 +342,66 @@ export default function HasilPage() {
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Program Studi Target</p>
                           <p className="font-bold text-gray-900 text-lg">{targetProgram.name}</p>
-                          <p className="text-sm text-blue-600 font-medium">{targetProgram.uniShort} — {targetProgram.faculty}</p>
-                          <p className="text-xs text-gray-400 mt-1">{targetProgram.uniName}</p>
+                          <p className="text-sm text-blue-600 font-medium">{targetProgram.uniShort}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {targetProgram.uniName}{targetProgram.province ? ` · ${targetProgram.province}` : ''}
+                          </p>
                         </div>
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${targetProgram.category === 'Saintek' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                          {targetProgram.category}
-                        </span>
+                        {targetProgram.peminatan && (
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${targetProgram.peminatan === 'SAINTEK' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                            {targetProgram.peminatan === 'SAINTEK' ? 'Saintek' : 'Soshum'}
+                          </span>
+                        )}
                       </div>
 
+                      {/* Data resmi SNPMB */}
+                      {(targetProgram.dayaTampung || targetProgram.peminat) && (
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: 'Daya Tampung SNBT', value: targetProgram.dayaTampung?.toLocaleString('id-ID') ?? '—' },
+                            { label: `Peminat ${targetProgram.peminatTahun ?? ''}`.trim(), value: targetProgram.peminat?.toLocaleString('id-ID') ?? '—' },
+                            { label: 'Keketatan', value: targetProgram.keketatan != null ? `${targetProgram.keketatan.toLocaleString('id-ID', { maximumFractionDigits: targetProgram.keketatan < 10 ? 1 : 0 })}%` : '—' },
+                          ].map(s => (
+                            <div key={s.label} className="p-3 rounded-xl bg-white border border-gray-100 text-center">
+                              <p className="text-lg font-bold text-gray-900">{s.value}</p>
+                              <p className="text-[11px] text-gray-500">{s.label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Ada passing grade, tapi peserta belum mengerjakan try out SNBT */}
+                      {pg != null && !hasSnbtResult && (
+                        <div className="p-5 rounded-2xl border-2 border-blue-100 bg-blue-50">
+                          <div className="flex items-center gap-6 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-500">
+                                Estimasi Passing Grade{targetProgram.passingGradeSource === 'estimasi' ? ' (dari keketatan)' : ''}
+                              </p>
+                              <p className="text-2xl font-black text-gray-800">~{pg}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-3">
+                            Kerjakan try out SNBT untuk melihat apakah skormu sudah mencapai estimasi passing grade prodi ini.
+                          </p>
+                          <a href="/tryout" className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1d4ed8] transition-all">
+                            Mulai Try Out SNBT →
+                          </a>
+                        </div>
+                      )}
+
+                      {pg == null && (
+                        <div className="p-5 rounded-2xl border-2 border-gray-200 bg-gray-50">
+                          <p className="text-base font-bold mb-1 text-gray-700">Estimasi passing grade belum tersedia</p>
+                          <p className="text-sm text-gray-600">
+                            Kami belum memiliki estimasi passing grade untuk prodi ini.
+                            {hasSnbtResult && <> Skor SNBT terakhirmu <span className="font-bold text-gray-800">{latestScore}</span>.</>} Pantau terus perkembanganmu di setiap try out.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Status */}
+                      {status && pg != null && (
                       <div className={`p-5 rounded-2xl border-2 ${status.status === 'aman' ? 'bg-green-50 border-green-200' : status.status === 'tipis' ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
                         <p className={`text-base font-bold mb-1 ${status.color}`}>
                           {status.label.replace('✅ ', '').replace('⚠️ ', '').replace('❌ ', '')}
@@ -309,15 +414,17 @@ export default function HasilPage() {
                           </div>
                           <div className="text-gray-300 text-2xl">vs</div>
                           <div>
-                            <p className="text-xs text-gray-500">Estimasi Passing Grade</p>
-                            <p className="text-2xl font-black text-gray-700">~{targetProgram.estimatedPassingGrade}</p>
+                            <p className="text-xs text-gray-500">
+                              Estimasi Passing Grade{targetProgram.passingGradeSource === 'estimasi' ? ' (dari keketatan)' : ''}
+                            </p>
+                            <p className="text-2xl font-black text-gray-700">~{pg}</p>
                           </div>
                         </div>
                         {status.status !== 'aman' && (
                           <p className="mt-3 text-sm font-medium text-gray-600 border-t border-current/10 pt-3">
                             Perlu meningkatkan{' '}
                             <span className="font-bold text-gray-800">
-                              {Math.max(0, (targetProgram.estimatedPassingGrade || 650) - latestScore + 20)} poin
+                              {Math.max(0, pg - latestScore + 20)} poin
                             </span>{' '}
                             lagi untuk zona aman.
                             {highestScore > latestScore && (
@@ -329,6 +436,7 @@ export default function HasilPage() {
                           </p>
                         )}
                       </div>
+                      )}
 
                       {/* Disclaimer */}
                       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -341,12 +449,12 @@ export default function HasilPage() {
                 <div className="text-center py-8">
                   <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="font-semibold text-gray-700 mb-1">Program studi "{userTargetUniv.major}" belum ada di database kami</p>
-                  <p className="text-sm text-gray-500 mb-4">Data kami mencakup prodi populer di 15 PTN terkemuka. Untuk prodi lainnya, cek langsung di snpmb.bppp.kemdikbud.go.id</p>
+                  <p className="text-sm text-gray-500 mb-4">Pastikan universitas dan program studi di halaman Profil dipilih dari daftar. Informasi resmi: snpmb.id</p>
                 </div>
               )}
             </CardContent>
           </Card>
-        ) : (
+        ) : userTargetUniv?.type === 'Sekdin' ? null : (
           <Card className="border-2 border-dashed border-gray-200">
             <CardContent className="pt-6 text-center py-10">
               <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-3" />

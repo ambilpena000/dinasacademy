@@ -23,6 +23,8 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminQuestions from './pages/admin/AdminQuestions';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminUniversities from './pages/admin/AdminUniversities';
+import AdminTryouts from './pages/admin/AdminTryouts';
 import PesananPage from './pages/PesananPage';
 
 // Protected Route Component
@@ -430,8 +432,10 @@ function AppContent() {
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+      <Route path="/admin/tryouts" element={<AdminRoute><AdminTryouts /></AdminRoute>} />
       <Route path="/admin/questions" element={<AdminRoute><AdminQuestions /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+      <Route path="/admin/universities" element={<AdminRoute><AdminUniversities /></AdminRoute>} />
       <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
 
       {/* Catch all - redirect to dashboard if logged in, otherwise to landing */}

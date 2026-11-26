@@ -12,7 +12,7 @@ import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Badge } from '../components/Badge';
 import { useAuth } from '../context/AuthContext';
-import { universities, getPrograms, searchUniversities } from '../data/universities';
+import { UniversityPicker, MajorPicker } from '../components/PtnPicker';
 
 export default function ProfilePage() {
   const { user, updateProfile, changePassword, refreshUser } = useAuth();
@@ -23,8 +23,6 @@ export default function ProfilePage() {
     refreshUser();
   }, []);
   const [isEditing, setIsEditing] = useState(false);
-  const [univSearch, setUnivSearch] = useState('');
-  const [showUnivDropdown, setShowUnivDropdown] = useState(false);
   // FIX #5/#7: foto dari server (user.photoUrl), bukan base64 di localStorage
   const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
   const [photoUrl, setPhotoUrl] = useState<string | null>(
@@ -438,28 +436,8 @@ export default function ProfilePage() {
                           <span>{formData.targetType === 'PTN' ? 'Universitas Tujuan' : 'Sekolah Kedinasan Tujuan'}</span>
                         </label>
                         {isEditing && formData.targetType === 'PTN' ? (
-                          <div className="relative">
-                            <input type="text" placeholder="Cari universitas..."
-                              value={univSearch || formData.targetUniversity}
-                              onChange={e => { setUnivSearch(e.target.value); setShowUnivDropdown(true); setFormData({...formData, targetUniversity: e.target.value, targetMajor: ''}); }}
-                              onFocus={() => setShowUnivDropdown(true)}
-                              className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] focus:border-transparent outline-none" />
-                            {showUnivDropdown && (
-                              <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                                {searchUniversities(univSearch || formData.targetUniversity).slice(0, 8).map(u => (
-                                  <button key={u.id} type="button"
-                                    onClick={() => { setFormData({...formData, targetUniversity: u.name, targetMajor: ''}); setUnivSearch(''); setShowUnivDropdown(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                    <span className="font-semibold text-gray-900">{u.short}</span>
-                                    <span className="text-gray-500 ml-2 text-xs">{u.name}</span>
-                                  </button>
-                                ))}
-                                {searchUniversities(univSearch || formData.targetUniversity).length === 0 && (
-                                  <p className="px-4 py-3 text-sm text-gray-400">Universitas tidak ditemukan</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <UniversityPicker value={formData.targetUniversity} zClass="z-20"
+                              onChange={name => setFormData(f => ({...f, targetUniversity: name, targetMajor: name === f.targetUniversity ? f.targetMajor : ''}))} />
                         ) : (
                           <Input name="targetUniversity" placeholder={formData.targetType === 'PTN' ? 'Universitas Indonesia' : 'STAN'}
                             value={formData.targetUniversity} onChange={handleChange} disabled={!isEditing} />
@@ -471,28 +449,10 @@ export default function ProfilePage() {
                           <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-2">
                             <Target className="w-4 h-4" /><span>Program Studi Tujuan</span>
                           </label>
-                          {isEditing ? (() => {
-                            const selectedUni = universities.find(u => u.name === formData.targetUniversity || u.short === formData.targetUniversity);
-                            const programs = selectedUni ? getPrograms(selectedUni.id) : [];
-                            return programs.length > 0 ? (
-                              <select value={formData.targetMajor} onChange={e => setFormData({...formData, targetMajor: e.target.value})}
-                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white">
-                                <option value="">-- Pilih Program Studi --</option>
-                                {['Saintek', 'Soshum', 'Campuran'].map(cat => {
-                                  const filtered = programs.filter(p => p.category === cat);
-                                  return filtered.length > 0 ? (
-                                    <optgroup key={cat} label={cat}>
-                                      {filtered.map(p => <option key={p.id} value={p.name}>{p.name} — {p.faculty}</option>)}
-                                    </optgroup>
-                                  ) : null;
-                                })}
-                              </select>
-                            ) : (
-                              <input type="text" placeholder="Ketik program studi tujuan" value={formData.targetMajor}
-                                onChange={e => setFormData({...formData, targetMajor: e.target.value})}
-                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] outline-none" />
-                            );
-                          })() : (
+                          {isEditing ? (
+                            <MajorPicker universityName={formData.targetUniversity} value={formData.targetMajor}
+                              onChange={label => setFormData(f => ({...f, targetMajor: label}))} />
+                          ) : (
                             <Input name="targetMajor" placeholder="Teknik Informatika" value={formData.targetMajor} onChange={handleChange} disabled={!isEditing} />
                           )}
                         </div>
@@ -667,28 +627,8 @@ export default function ProfilePage() {
                       <span className="text-red-500">*</span>
                     </label>
                     {formData.targetType === 'PTN' ? (
-                      <div className="relative">
-                        <input type="text" placeholder="Cari universitas..."
-                          value={univSearch || formData.targetUniversity}
-                          onChange={e => { setUnivSearch(e.target.value); setShowUnivDropdown(true); setFormData({...formData, targetUniversity: e.target.value, targetMajor: ''}); }}
-                          onFocus={() => setShowUnivDropdown(true)}
-                          className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] outline-none" />
-                        {showUnivDropdown && (
-                          <div className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                            {searchUniversities(univSearch || formData.targetUniversity).slice(0, 8).map(u => (
-                              <button key={u.id} type="button"
-                                onClick={() => { setFormData({...formData, targetUniversity: u.name, targetMajor: ''}); setUnivSearch(''); setShowUnivDropdown(false); }}
-                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                <span className="font-semibold text-gray-900">{u.short}</span>
-                                <span className="text-gray-500 ml-2 text-xs">{u.name}</span>
-                              </button>
-                            ))}
-                            {searchUniversities(univSearch || formData.targetUniversity).length === 0 && (
-                              <p className="px-4 py-3 text-sm text-gray-400">Tidak ditemukan</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <UniversityPicker value={formData.targetUniversity} zClass="z-30"
+                              onChange={name => setFormData(f => ({...f, targetUniversity: name, targetMajor: name === f.targetUniversity ? f.targetMajor : ''}))} />
                     ) : (
                       <Input name="targetUniversity" placeholder="STAN / STIS / IPDN / STIN"
                         value={formData.targetUniversity} onChange={handleChange} />
@@ -701,28 +641,8 @@ export default function ProfilePage() {
                         <Target className="w-4 h-4" /><span>Program Studi</span>
                         <span className="text-red-500">*</span>
                       </label>
-                      {(() => {
-                        const selectedUni = universities.find(u => u.name === formData.targetUniversity || u.short === formData.targetUniversity);
-                        const programs = selectedUni ? getPrograms(selectedUni.id) : [];
-                        return programs.length > 0 ? (
-                          <select value={formData.targetMajor} onChange={e => setFormData({...formData, targetMajor: e.target.value})}
-                            className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] outline-none bg-white">
-                            <option value="">-- Pilih Program Studi --</option>
-                            {['Saintek', 'Soshum', 'Campuran'].map(cat => {
-                              const filtered = programs.filter(p => p.category === cat);
-                              return filtered.length > 0 ? (
-                                <optgroup key={cat} label={cat}>
-                                  {filtered.map(p => <option key={p.id} value={p.name}>{p.name} — {p.faculty}</option>)}
-                                </optgroup>
-                              ) : null;
-                            })}
-                          </select>
-                        ) : (
-                          <input type="text" placeholder="Ketik program studi" value={formData.targetMajor}
-                            onChange={e => setFormData({...formData, targetMajor: e.target.value})}
-                            className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2563EB] outline-none" />
-                        );
-                      })()}
+                      <MajorPicker universityName={formData.targetUniversity} value={formData.targetMajor}
+                              onChange={label => setFormData(f => ({...f, targetMajor: label}))} />
                     </div>
                   )}
                 </div>

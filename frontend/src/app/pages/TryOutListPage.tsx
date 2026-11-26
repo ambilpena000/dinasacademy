@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useTryouts } from '../hooks/useTryouts';
 import { useAuth } from '../context/AuthContext';
+import { normalizeCategory, categoriesForPackage, categoryBadgeClass } from '../lib/category';
 
 export default function TryOutListPage() {
   const { user } = useAuth();
@@ -29,14 +30,8 @@ export default function TryOutListPage() {
 
   // Tentukan kategori yang bisa diakses berdasarkan paket
   const allowedCategories = React.useMemo((): string[] => {
-    if (!user?.hasPurchasedPackage || !user?.packageType) return [];
-    const pkg = (user.packageType || '').toLowerCase();
-    if (pkg.includes('combo') || pkg.includes('lengkap')) return ['PTN', 'SKD', 'STIS'];
-    if (pkg.includes('ptn') || pkg.includes('snbt')) return ['PTN'];
-    if (pkg.includes('stis')) return ['STIS', 'SKD'];
-    if (pkg.includes('skd') || pkg.includes('sekdin') || user.packageType === 'SKD') return ['SKD'];
-    if (pkg.includes('ipdn') || pkg.includes('polstat')) return ['SKD'];
-    return [];
+    if (!user?.hasPurchasedPackage) return [];
+    return categoriesForPackage(user.packageType);
   }, [user]);
 
   // Hitung maxTryouts berdasarkan packageType dari backend (tanpa mock)
@@ -70,7 +65,7 @@ export default function TryOutListPage() {
   // Filter: sesuai kategori paket + search + batasi sesuai jumlah paket
   const filteredTryOuts = React.useMemo(() => {
     const byCategory = allTryouts.filter(t => {
-      const matchPackage = allowedCategories.includes(t.category);
+      const matchPackage = allowedCategories.includes(normalizeCategory(t.category) ?? '');
       return matchPackage;
     });
     // Batasi sesuai jumlah paket (ambil yang pertama N)
@@ -83,11 +78,7 @@ export default function TryOutListPage() {
 
   const completedCount = filteredTryOuts.filter(t => t.isCompleted).length;
 
-  const categoryStyle = (c: string) => {
-    if (c === 'PTN') return 'bg-blue-50 text-blue-700';
-    if (c === 'SKD') return 'bg-violet-50 text-violet-700';
-    return 'bg-sky-50 text-sky-700';
-  };
+  const categoryStyle = (c: string) => categoryBadgeClass(c);
 
   // Belum beli paket
   if (!user?.hasPurchasedPackage) {

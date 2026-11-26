@@ -126,8 +126,45 @@ export const api = {
   getResult:   (tryoutId: string) => request(`/results/${tryoutId}`),
   getRanking:  (tryoutId: string) => request(`/results/${tryoutId}/ranking`),
 
+  // ── PTN & Program Studi ───────────────────────────────────────────
+  getUniversities: (search?: string) =>
+    request(`/universities${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getUniversityMajors: (universityId: number | string) =>
+    request(`/universities/${universityId}/majors`),
+
   // ── Admin ─────────────────────────────────────────────────────────
   getAllUsers: () => request('/users'),
+};
+
+const qs = (params: Record<string, string | number | boolean | undefined | null>) => {
+  const s = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') s.set(k, String(v));
+  });
+  const str = s.toString();
+  return str ? `?${str}` : '';
+};
+
+// ── Admin CRUD PTN & Program Studi ────────────────────────────────
+export const ptnAdminApi = {
+  getUniversities: (search?: string) => request(`/universities/admin/all${qs({ search })}`),
+  createUniversity: (data: any) =>
+    request('/universities', { method: 'POST', body: JSON.stringify(data) }),
+  updateUniversity: (id: number, data: any) =>
+    request(`/universities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUniversity: (id: number) => request(`/universities/${id}`, { method: 'DELETE' }),
+
+  getMajors: (params: {
+    universityId?: number; search?: string; peminatan?: string; jenjang?: string;
+    missingPassingGrade?: boolean; page?: number; limit?: number;
+  }) => request(`/majors/admin/all${qs(params)}`),
+  createMajor: (data: any) =>
+    request('/majors', { method: 'POST', body: JSON.stringify(data) }),
+  updateMajor: (id: number, data: any) =>
+    request(`/majors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteMajor: (id: number) => request(`/majors/${id}`, { method: 'DELETE' }),
+  importPassingGrades: (rows: { id: number; passingGrade: number | null }[]) =>
+    request('/majors/passing-grades/import', { method: 'POST', body: JSON.stringify({ rows }) }),
 };
 
 // ── Admin CRUD Tryout + upload soal ───────────────────────────────
@@ -144,7 +181,9 @@ export const adminApi = {
   getTryoutsAdmin: () => request('/tryouts'),
 
   getQuestionStats: (tryoutId: string | number) =>
-    request(`/results/${tryoutId}/question-stats`),
+    request(`/exam/${tryoutId}/question-stats`),
+  recalculateTryout: (tryoutId: string | number) =>
+    request(`/exam/${tryoutId}/recalculate`, { method: 'POST' }),
 
   uploadQuestions: (file: File) => {
     const token = localStorage.getItem('access_token');

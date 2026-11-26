@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
 import { 
-  CheckCircle, Star, Target, Trophy, ArrowLeft, CreditCard, 
+  CheckCircle, Star, Target, ArrowLeft, CreditCard, 
   Smartphone, Building2, Copy, Clock, Play, Shield, Users,
   TrendingUp, BookOpen, Award, Sparkles, Gift,
   CheckCheck, Rocket, Crown, Heart, FileText, MessageCircle
@@ -543,20 +543,17 @@ export default function PaketPage() {
             transition={{ delay: 0.4 }}
             className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl"
           >
-            Bergabung dengan <span className="font-bold text-[#FBBF24]">12.000+ siswa</span> yang sudah berhasil diterima di kampus impian mereka!
+            Persiapkan dirimu dengan try out berbasis CAT untuk diterima di <span className="font-bold text-[#FBBF24]">kampus impianmu</span>!
           </motion.p>
 
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+            className="grid grid-cols-1 gap-4 max-w-[12rem] mx-auto"
           >
             {[
-              { icon: Users, label: '12.000+', sublabel: 'Siswa Aktif' },
-              { icon: Trophy, label: '95%', sublabel: 'Lulus PTN' },
               { icon: BookOpen, label: '1000+', sublabel: 'Bank Soal' },
-              { icon: Award, label: '4.9/5', sublabel: 'Rating Siswa' }
             ].map((stat, idx) => (
               <motion.div
                 key={idx}
@@ -831,7 +828,7 @@ export default function PaketPage() {
           {
             icon: Users,
             title: 'Komunitas Aktif',
-            description: 'Diskusi & sharing dengan 12.000+ siswa lainnya',
+            description: 'Diskusi & sharing dengan sesama peserta',
             color: 'from-blue-500 to-cyan-500'
           }
         ].map((item, idx) => (

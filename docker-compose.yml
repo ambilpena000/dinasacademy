@@ -1,4 +1,12 @@
-version: '3.9'
+# docker-compose.yml — Production Dinas Academy (1 server VPS)
+#
+#   Internet ──► Caddy (80/443, HTTPS otomatis)
+#                 ├── /api/*, /uploads/*  ──► backend  (NestJS :3000)
+#                 └── selain itu          ──► frontend (Nginx  :80)
+#   backend ──► postgres (:5432, hanya di jaringan internal + localhost server)
+#
+# Semua nilai diambil dari file .env di folder ini (template: env.example).
+# Panduan lengkap: DEPLOY.md
 
 services:
   # ── PostgreSQL Database ───────────────────────────────────────
@@ -9,11 +17,13 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-dinasacademy}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD wajib diisi di file .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Hanya bisa diakses dari server itu sendiri (bukan dari internet).
+    # Akses dari komputer Anda lewat SSH tunnel: ssh -L 5432:localhost:5432 root@IP_SERVER
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
       interval: 10s
@@ -35,14 +45,23 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD wajib diisi di file .env}
       DB_NAME: ${DB_NAME:-dinasacademy}
-      JWT_SECRET: ${JWT_SECRET:-ganti_secret_ini_di_production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET wajib diisi di file .env (min. 32 karakter acak)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       PORT: 3000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:80}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL wajib diisi, mis. https://dinasacademy.com}
+      # Opsional: email untuk reset password
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    # Foto profil & file upload disimpan di volume agar tidak hilang saat update/rebuild
+    volumes:
+      - uploads_data:/app/uploads
+    # Tidak dibuka ke internet — diakses lewat Caddy. Port lokal untuk cek dari server: curl localhost:3000/api
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
   # ── Frontend React (Nginx) ────────────────────────────────────
   frontend:
@@ -50,13 +69,34 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        # Alamat API yang "ditanam" ke website saat build, mis. https://dinasacademy.com/api
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL wajib diisi, mis. https://dinasacademy.com/api}
     container_name: dinasacademy-frontend
     restart: unless-stopped
     depends_on:
       - backend
+
+  # ── Caddy: reverse proxy + HTTPS otomatis ─────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: dinasacademy-caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN wajib diisi, mis. dinasacademy.com}
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # sertifikat HTTPS (jangan dihapus)
+      - caddy_config:/config
 
 volumes:
   postgres_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:

@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
+import { getJwtSecret } from '../config/production-check';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { UsersModule } from '../users/users.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'dinasacademy_secret'),
+        secret: getJwtSecret(config.get<string>('JWT_SECRET')),
         // FIX #6: token default 7d, bisa diubah di .env JWT_EXPIRES_IN
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') as any },
       }),

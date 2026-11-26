@@ -19,6 +19,9 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
+# Folder upload (di-mount sebagai volume oleh docker-compose)
+RUN mkdir -p /app/uploads/photos
+
 EXPOSE 3000
 
 CMD ["node", "dist/main"]

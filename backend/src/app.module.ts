@@ -9,6 +9,7 @@ import { ExamModule } from './exam/exam.module';
 import { ResultsModule } from './results/results.module';
 import { OrdersModule } from './orders/orders.module';
 import { PackagesModule } from './packages/packages.module';
+import { UniversitiesModule } from './universities/universities.module';
 
 @Module({
   imports: [
@@ -30,9 +31,11 @@ import { PackagesModule } from './packages/packages.module';
           password: config.get<string>('DB_PASSWORD', ''),
           database: config.get<string>('DB_NAME', 'dinasacademy'),
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
-          // synchronize hanya aktif di development
-          // di production gunakan: npm run migration:run
+          migrations: [__dirname + '/migrations/*{.ts,.js}'],
+          // Development: synchronize (skema mengikuti entity otomatis).
+          // Production : synchronize mati, migrasi tertunda dijalankan otomatis saat start.
           synchronize: isDev,
+          migrationsRun: !isDev,
           logging: isDev,
         };
       },
@@ -46,6 +49,7 @@ import { PackagesModule } from './packages/packages.module';
     ResultsModule,
     OrdersModule,
     PackagesModule,
+    UniversitiesModule,
   ],
 })
 export class AppModule {}
