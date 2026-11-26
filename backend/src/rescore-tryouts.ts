@@ -11,17 +11,13 @@ import { Tryout } from './tryouts/tryout.entity';
 import {
   calculateScore, computeQuestionWeights, firstAttempts, rankBestAttempts, usesWeightedScoring,
 } from './exam/scoring';
+import { dbConnectionOptions } from './config/db-connection';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'dinasacademy',
+  ...dbConnectionOptions(),
   entities: [ExamResult, Question, Tryout],
   synchronize: false,
 });

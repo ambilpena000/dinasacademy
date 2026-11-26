@@ -2,20 +2,16 @@ import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { Tryout } from './tryouts/tryout.entity';
 import { Question } from './questions/question.entity';
+import { dbConnectionOptions } from './config/db-connection';
 
 // Load .env dari root backend (satu level di atas src/)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'dinasacademy',
+  ...dbConnectionOptions(),
   entities: [Tryout, Question],
-  synchronize: true,
+  synchronize: false, // skema dibuat lewat migrasi
 });
 
 type TryoutSeed = Omit<Tryout, 'id' | 'createdAt' | 'updatedAt'> & {

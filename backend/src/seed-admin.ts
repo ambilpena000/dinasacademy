@@ -19,17 +19,13 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { User } from './users/user.entity';
+import { dbConnectionOptions } from './config/db-connection';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
 
 const ds = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'dinasacademy',
+  ...dbConnectionOptions(),
   entities: [User],
   synchronize: false,
 });

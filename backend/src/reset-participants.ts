@@ -12,17 +12,13 @@
  */
 import * as path from 'path';
 import { DataSource } from 'typeorm';
+import { dbConnectionOptions } from './config/db-connection';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
 
 const ds = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'dinasacademy',
+  ...dbConnectionOptions(),
 });
 
 const PARTICIPANTS = `SELECT id FROM "user" WHERE role IS DISTINCT FROM 'admin'`;

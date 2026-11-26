@@ -1,20 +1,16 @@
 import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { Package } from './packages/package.entity';
+import { dbConnectionOptions } from './config/db-connection';
 
 // Load .env dari root backend
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'dinasacademy',
+  ...dbConnectionOptions(),
   entities: [Package],
-  synchronize: true,
+  synchronize: false, // skema dibuat lewat migrasi
 });
 
 async function seedPackages() {

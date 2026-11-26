@@ -34,7 +34,7 @@ export default function ProfilePage() {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { alert('Ukuran foto maksimal 3MB'); return; }
+    if (file.size > 15 * 1024 * 1024) { alert('Ukuran foto maksimal 15MB'); return; }
     if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) { alert('Hanya file gambar (jpg, png, webp) yang diizinkan'); return; }
 
     // Tampilkan preview lokal dulu (UX responsif)
@@ -44,7 +44,10 @@ export default function ProfilePage() {
 
     try {
       const { api } = await import('../lib/api');
-      const result = await api.uploadPhoto(file);
+      const { resizeImage } = await import('../lib/image');
+      // Kecilkan ke maks. 512px sebelum upload (foto disimpan di database)
+      const small = await resizeImage(file);
+      const result = await api.uploadPhoto(small);
       // Ganti preview lokal dengan URL server
       setPhotoUrl(`${BASE_URL}${result.photoUrl}`);
       updateProfile({ photoUrl: result.photoUrl });

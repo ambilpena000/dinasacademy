@@ -4,20 +4,20 @@ import {
   UploadedFile, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-
-// Pastikan folder uploads/photos ada
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'photos');
-if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+import { UserPhoto } from './user-photo.entity';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    @InjectRepository(UserPhoto) private photoRepo: Repository<UserPhoto>,
+  ) {}
 
   @Get('profile/me')
   getProfileMe(@Request() req: any) {
@@ -46,14 +46,9 @@ export class UsersController {
   @Post('profile/photo')
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: UPLOAD_DIR,
-        filename: (_req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-          cb(null, `${unique}${extname(file.originalname)}`);
-        },
-      }),
-      limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB
+      // Disimpan di database (bukan disk) — aman untuk hosting tanpa disk permanen
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB (frontend sudah mengecilkan ke ±50 KB)
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|webp|gif)$/)) {
           return cb(new BadRequestException('Hanya file gambar yang diizinkan (jpg, png, webp)'), false);
@@ -64,7 +59,9 @@ export class UsersController {
   )
   async uploadPhoto(@UploadedFile() file: any, @Request() req: any) {
     if (!file) throw new BadRequestException('File foto tidak ditemukan');
-    const photoUrl = `/uploads/photos/${file.filename}`;
+    await this.photoRepo.save({ userId: req.user.id, mimeType: file.mimetype, data: file.buffer });
+    // ?v= berubah tiap upload → browser memuat foto baru
+    const photoUrl = `/api/users/${req.user.id}/photo?v=${Date.now()}`;
     await this.usersService.update(req.user.id, { photoUrl });
     return { photoUrl };
   }

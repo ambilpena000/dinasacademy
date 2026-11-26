@@ -14,10 +14,11 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const config = app.get(ConfigService);
 
-    app.enableCors({
-      origin: config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
-      credentials: true,
-    });
+    // FRONTEND_URL boleh berisi beberapa alamat dipisah koma,
+    // mis. "https://dinasacademy.pages.dev,https://dinasacademy.com"
+    const origins = config.get<string>('FRONTEND_URL', 'http://localhost:5173')
+      .split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+    app.enableCors({ origin: origins.length > 1 ? origins : origins[0], credentials: true });
 
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     app.setGlobalPrefix('api');

@@ -23,6 +23,15 @@ describe('productionConfigProblems', () => {
     expect(productionConfigProblems({ ...good, DB_PASSWORD: '' })).toHaveLength(1);
   });
 
+  it('DATABASE_URL (database online) tidak butuh DB_PASSWORD terpisah', () => {
+    expect(productionConfigProblems({ ...good, DB_PASSWORD: '', DATABASE_URL: 'postgresql://u:p@ep-x.neon.tech/db?sslmode=require' })).toEqual([]);
+  });
+
+  it('FRONTEND_URL boleh beberapa alamat dipisah koma, tapi tidak boleh localhost', () => {
+    expect(productionConfigProblems({ ...good, FRONTEND_URL: 'https://a.pages.dev, https://a.com' })).toEqual([]);
+    expect(productionConfigProblems({ ...good, FRONTEND_URL: 'https://a.pages.dev,http://localhost:5173' })).toHaveLength(1);
+  });
+
   it('menolak FRONTEND_URL localhost', () => {
     expect(productionConfigProblems({ ...good, FRONTEND_URL: 'http://localhost:80' })).toHaveLength(1);
   });

@@ -28,11 +28,13 @@ export function productionConfigProblems(env: NodeJS.ProcessEnv = process.env): 
   else if (KNOWN_WEAK_SECRETS.has(jwt) || jwt.length < 32) {
     problems.push('JWT_SECRET terlalu lemah/bawaan — gunakan minimal 32 karakter acak');
   }
-  if (KNOWN_WEAK_DB_PASSWORDS.has(env.DB_PASSWORD || '')) {
+  // Database online (Neon dsb.) memakai DATABASE_URL — password-nya dibuat oleh penyedia
+  if (!env.DATABASE_URL && KNOWN_WEAK_DB_PASSWORDS.has(env.DB_PASSWORD || '')) {
     problems.push('DB_PASSWORD kosong atau bawaan — gunakan password yang kuat');
   }
-  if (!env.FRONTEND_URL || /localhost|127\.0\.0\.1/.test(env.FRONTEND_URL)) {
-    problems.push('FRONTEND_URL harus berisi domain website (mis. https://dinasacademy.com)');
+  const origins = (env.FRONTEND_URL || '').split(',').map((o) => o.trim()).filter(Boolean);
+  if (!origins.length || origins.some((o) => /localhost|127\.0\.0\.1/.test(o))) {
+    problems.push('FRONTEND_URL harus berisi alamat website (mis. https://dinasacademy.pages.dev)');
   }
   return problems;
 }

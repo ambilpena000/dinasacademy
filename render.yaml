@@ -1,0 +1,31 @@
+# render.yaml — Blueprint backend Dinas Academy untuk Render (paket GRATIS).
+# Render → New → Blueprint → pilih repo ini. Panduan: DEPLOY-GRATIS.md
+#
+# Catatan paket gratis Render:
+#  - Backend "tidur" setelah 15 menit tanpa pengunjung; bangun ±1 menit saat diakses lagi.
+#  - Disk tidak permanen → foto profil disimpan di database (sudah ditangani di kode).
+#  - Tidak ada akses shell → perintah admin (seed, reset) dijalankan dari laptop ke DATABASE_URL.
+services:
+  - type: web
+    name: dinasacademy-api
+    runtime: node
+    plan: free
+    region: singapore          # samakan dengan region database Neon (AWS Singapore)
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /api/health
+    autoDeploy: true           # deploy ulang otomatis setiap push ke GitHub
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true    # dibuat acak oleh Render
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DATABASE_URL      # isi: connection string Neon (…?sslmode=require)
+        sync: false
+      - key: FRONTEND_URL      # isi: https://NAMA-PROYEK.pages.dev (pisahkan koma bila >1 alamat)
+        sync: false

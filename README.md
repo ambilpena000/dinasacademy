@@ -118,6 +118,13 @@ npm run start:frontend
 
 ---
 
+## 🌐 Hosting
+
+* **Gratis (tahap awal):** Neon + Render + Cloudflare Pages — lihat [DEPLOY-GRATIS.md](DEPLOY-GRATIS.md)
+* **VPS sendiri (Docker + HTTPS otomatis):** lihat [DEPLOY.md](DEPLOY.md)
+
+---
+
 ## 🐳 Setup Otomatis dengan Docker
 
 Jika Anda tidak ingin menginstal PostgreSQL secara manual, Anda dapat menjalankan seluruh ekosistem (Database + Backend + Frontend) menggunakan Docker Compose:
