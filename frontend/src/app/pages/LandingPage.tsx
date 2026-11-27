@@ -13,6 +13,8 @@ import { Button } from '../components/Button';
 import DraggableWA from '../components/DraggableWA';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { api } from '../lib/api';
+import { mapPackage } from '../lib/packages';
+import { PackagePrice, PromoRibbon } from '../components/PackagePrice';
 
 
 
@@ -25,20 +27,7 @@ export default function LandingPage() {
     api.getPackages()
       .then((data: any[]) => {
         if (Array.isArray(data)) {
-          setPackages(data.map((p: any, i: number) => ({
-            id: String(p.id),
-            name: p.name,
-            description: p.description,
-            price: Number(p.price),
-            duration: typeof p.duration === 'number'
-              ? (p.duration >= 360 ? '12 bulan' : p.duration >= 170 ? '6 bulan' : `${p.duration} hari`)
-              : (typeof p.duration === 'string' ? p.duration : '12 bulan'),
-            features: Array.isArray(p.features) ? p.features : [],
-            includedTryOuts: Array.isArray(p.includedTryouts)
-              ? p.includedTryouts.length
-              : (typeof p.includedTryOuts === 'number' ? p.includedTryOuts : 0),
-            isPopular: i === 0,
-          })));
+          setPackages(data.map((p: any, i: number) => ({ ...mapPackage(p), isPopular: i === 0 })));
         }
       })
       .catch(() => {})
@@ -329,10 +318,12 @@ export default function LandingPage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl lg:text-5xl font-black text-gray-900 mb-4">
-              Pilih Program Persiapan
+              {packages.some((p) => p.isFree) ? 'Program Persiapan GRATIS' : 'Pilih Program Persiapan'}
             </h2>
             <p className="text-xl text-gray-600">
-              Raih impianmu masuk Perguruan Tinggi Negeri favorit dengan program terbaik!
+              {packages.some((p) => p.isFree)
+                ? <>Promo awal rilis: paket senilai <span className="line-through text-gray-400">Rp49.000</span> kini <span className="font-black text-emerald-600">GRATIS</span>. Ambil sekarang selama promo berlaku!</>
+                : 'Raih impianmu masuk Perguruan Tinggi Negeri favorit dengan program terbaik!'}
             </p>
           </motion.div>
 
@@ -341,7 +332,7 @@ export default function LandingPage() {
               <div className="w-10 h-10 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-5">
+            <div className={`mx-auto grid gap-5 ${packages.length === 1 ? 'max-w-sm' : 'max-w-3xl md:grid-cols-2'}`}>
               {packages.map((pkg, index) => (
                 <motion.div
                   key={pkg.id}
@@ -356,7 +347,8 @@ export default function LandingPage() {
                     pkg.isPopular ? 'border-[#2563EB] ring-2 ring-blue-200' : 'border-gray-100'
                   }`}>
                     {/* Popular Badge */}
-                    {pkg.isPopular && (
+                    {pkg.isFree && <PromoRibbon />}
+                      {pkg.isPopular && (
                       <div className="absolute top-3 right-3 z-10">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
                           ⭐ TERBAIK
@@ -380,19 +372,7 @@ export default function LandingPage() {
                         <p className="text-gray-600 text-xs leading-snug">{pkg.description}</p>
                       </div>
 
-                      {/* Pricing */}
-                      <div className="text-center mb-4 pb-4 border-b border-gray-200">
-                        <div className="flex items-baseline justify-center space-x-1 mb-0.5">
-                          <span className="text-3xl font-black bg-gradient-to-r from-[#2563EB] to-[#3B82F6] bg-clip-text text-transparent">
-                            {(pkg.price / 1000).toFixed(0)}K
-                          </span>
-                          <span className="text-gray-500 text-sm font-medium">/{pkg.duration}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          <span className="line-through">Rp {((pkg.price * 1.3) / 1000).toFixed(0)}K</span>
-                          <span className="ml-1 text-green-600 font-semibold">-30%</span>
-                        </p>
-                      </div>
+                      <PackagePrice pkg={pkg} />
 
                       {/* Features */}
                       <div className="space-y-2 mb-4">
@@ -420,7 +400,7 @@ export default function LandingPage() {
                           <div>
                             <p className="text-xs text-gray-600 font-medium leading-none mb-0.5">Try Out</p>
                             <p className="text-sm font-black text-[#2563EB] leading-none">
-                              {pkg.includedTryOuts} Paket
+                              {pkg.tryoutLabel}
                             </p>
                           </div>
                         </div>
@@ -430,7 +410,7 @@ export default function LandingPage() {
                       <Link to="/paket">
                         <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
                           <Button className="w-full bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] font-bold text-white shadow-lg">
-                            Pilih Paket
+                            {pkg.isFree ? 'Ambil Gratis Sekarang' : 'Pilih Paket'}
                           </Button>
                         </motion.div>
                       </Link>

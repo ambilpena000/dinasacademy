@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, Package, LogOut, Target,
   ShieldCheck, FileQuestion, Users, Settings,
-  Bell, RefreshCw, ChevronRight, GraduationCap, ClipboardList
+  Bell, RefreshCw, ChevronRight, GraduationCap, ClipboardList, Gift
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,6 +17,7 @@ interface AdminLayoutProps {
 
 const NAV_ITEMS = [
   { path: '/admin',           label: 'Dashboard',         icon: LayoutDashboard, exact: true },
+  { path: '/admin/packages',  label: 'Paket',              icon: Gift },
   { path: '/admin/orders',    label: 'Pesanan',            icon: Package },
   { path: '/admin/tryouts',   label: 'Try Out',            icon: ClipboardList },
   { path: '/admin/questions', label: 'Bank Soal',          icon: FileQuestion },

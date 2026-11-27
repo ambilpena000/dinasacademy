@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
+import { QuestionContent } from '../components/QuestionContent';
 import { api } from '../lib/api';
 import { normalizeCategory } from '../lib/category';
 
@@ -112,6 +113,7 @@ export default function TryOutExamPage() {
         const mapped = Array.isArray(questionsData) ? questionsData.map((q: any) => ({
           id: q.id,
           questionText: q.questionText,
+          passage: q.passage || '',
           subjectCode: (q.subtestCode || '').toUpperCase(),
           subjectName: q.subtestName || q.subtestCode,
           options: [
@@ -484,9 +486,11 @@ export default function TryOutExamPage() {
                       </button>
                     </div>
 
-                    <p className="text-base text-gray-900 leading-relaxed mb-5">
-                      {subtestQs[currentQuestion]?.questionText}
-                    </p>
+                    <QuestionContent
+                      className="text-base text-gray-900 mb-5"
+                      passage={subtestQs[currentQuestion]?.passage}
+                      questionText={subtestQs[currentQuestion]?.questionText || ''}
+                    />
 
                     <div className="space-y-2.5">
                       {subtestQs[currentQuestion]?.options.map((opt: any) => (

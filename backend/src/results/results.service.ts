@@ -21,6 +21,11 @@ export class ResultsService {
     });
   }
 
+  /** Jumlah hasil ujian (semua peserta) untuk satu try out. */
+  async countByTryout(tryoutId: number) {
+    return this.resultRepo.count({ where: { tryoutId } });
+  }
+
   async getResultByTryout(userId: number, tryoutId: number) {
     return this.resultRepo.findOne({ where: { userId, tryoutId } });
   }

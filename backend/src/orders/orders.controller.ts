@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Body,
-  Param, UseGuards, Request, ForbiddenException,
+  Param, UseGuards, Request, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { UsersService } from '../users/users.service';
@@ -22,6 +22,18 @@ export class OrdersController {
   @Post('webhook')
   handleWebhook(@Body() body: any) {
     return this.ordersService.handlePaymentWebhook(body);
+  }
+
+  // POST /orders/claim-free { packageId } — ambil paket gratis, langsung aktif
+  @Post('claim-free')
+  async claimFree(@Request() req: any, @Body() body: { packageId: number }) {
+    if (!body?.packageId) throw new BadRequestException('packageId wajib diisi');
+    const { order, pkg, alreadyClaimed } = await this.ordersService.claimFree(req.user.id, Number(body.packageId));
+    const user = await this.usersService.findOne(req.user.id);
+    if (!user.hasPurchasedPackage || !user.packageType) {
+      await this.usersService.update(req.user.id, { hasPurchasedPackage: true, packageType: pkg.type as any });
+    }
+    return { order, alreadyClaimed };
   }
 
   @Post()
@@ -60,12 +72,15 @@ export class OrdersController {
 
     // Cek apakah user masih punya order aktif lain
     const allOrders = await this.ordersService.getUserOrders(order.userId);
-    const stillActive = allOrders.some(o => o.status === 'active' && String(o.id) !== id);
+    const stillActive = allOrders.find(o => o.status === 'active' && String(o.id) !== id);
     if (!stillActive) {
       await this.usersService.update(order.userId, {
         hasPurchasedPackage: false,
         packageType: undefined,
       });
+    } else {
+      // Label paket user mengikuti paket yang masih aktif (mis. paket gratis)
+      await this.usersService.update(order.userId, { packageType: stillActive.packageType as any });
     }
 
     return order;

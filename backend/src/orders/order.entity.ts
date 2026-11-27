@@ -17,6 +17,10 @@ export class Order {
   @ManyToOne(() => User)
   user!: User;
 
+  /** Paket yang dipesan (null untuk pesanan lama sebelum kolom ini ada). */
+  @Column({ type: 'integer', nullable: true })
+  packageId?: number | null;
+
   @Column()
   packageName!: string;
 

@@ -48,4 +48,17 @@ describe('tryout access', () => {
     const ids = accessibleTryouts({ hasPurchasedPackage: true, packageType: 'PTN Premium' }, tryouts).map((t) => t.id);
     expect(ids).toEqual([1, 2]);
   });
+
+  it('paket dengan try out pilihan admin: hanya try out itu (yang aktif)', () => {
+    const ids = accessibleTryouts({ hasPurchasedPackage: true, entitlements: [{ packageType: 'PTN Premium', tryoutIds: [2, 4] }] }, tryouts).map((t) => t.id);
+    expect(ids).toEqual([2]);
+  });
+
+  it('beberapa paket aktif: akses gabungan (gratis + berbayar)', () => {
+    const ids = accessibleTryouts({
+      hasPurchasedPackage: true,
+      entitlements: [{ packageType: 'PTN Premium', tryoutIds: [1] }, { packageType: 'SKD' }],
+    }, tryouts).map((t) => t.id);
+    expect(ids).toEqual([1, 3]);
+  });
 });

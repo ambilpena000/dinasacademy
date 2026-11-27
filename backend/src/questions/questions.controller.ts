@@ -1,7 +1,7 @@
 import {
   Controller, Get, Post, Put, Delete,
   Body, Param, Query, UseGuards, UseInterceptors,
-  UploadedFile, Request, ForbiddenException, ParseIntPipe,
+  UploadedFile, Request, ForbiddenException, ParseIntPipe, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -9,6 +9,8 @@ import { QuestionsService } from './questions.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TryoutsService } from '../tryouts/tryouts.service';
 import { ResultsService } from '../results/results.service';
+import { ImportWordDto } from './questions.service';
+import { parseWordQuestions } from './word-import';
 
 @Controller('questions')
 export class QuestionsController {
@@ -49,6 +51,50 @@ export class QuestionsController {
   async uploadFile(@UploadedFile() file: any, @Request() req: any) {
     if (req.user.role !== 'admin') throw new ForbiddenException('Admin only');
     return this.questionsService.processFile(file);
+  }
+
+  // POST /questions/import-word/preview — baca file Word satu subtes, tampilkan pratinjau (belum disimpan)
+  @Post('import-word/preview')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }))
+  async previewWord(@UploadedFile() file: any, @Request() req: any, @Body() body: { tryoutId?: string; subtestCode?: string }) {
+    if (req.user.role !== 'admin') throw new ForbiddenException('Admin only');
+    if (!file?.buffer) throw new BadRequestException('File belum dipilih');
+    if (!/\.docx$/i.test(file.originalname || '')) throw new BadRequestException('Gunakan file Word .docx (bukan .doc / PDF)');
+    const tryoutId = Number(body.tryoutId);
+    const subtestCode = String(body.subtestCode || '').toUpperCase();
+    if (!tryoutId || !subtestCode) throw new BadRequestException('Pilih try out dan subtes terlebih dahulu');
+    const tryout = await this.tryoutsService.findOne(tryoutId);
+    let parsed;
+    try {
+      parsed = await parseWordQuestions(file.buffer);
+    } catch {
+      throw new BadRequestException('File Word tidak dapat dibaca. Pastikan file .docx tidak rusak atau terkunci.');
+    }
+    return {
+      tryout: { id: tryout.id, title: tryout.title, category: tryout.category },
+      subtestCode,
+      existingCount: await this.questionsService.countSubtest(tryoutId, subtestCode),
+      resultCount: await this.resultsService.countByTryout(tryoutId),
+      ...parsed,
+    };
+  }
+
+  // POST /questions/import-word — simpan soal hasil pratinjau untuk satu subtes
+  @Post('import-word')
+  @UseGuards(JwtAuthGuard)
+  async saveWord(@Request() req: any, @Body() body: ImportWordDto) {
+    if (req.user.role !== 'admin') throw new ForbiddenException('Admin only');
+    const tryoutId = Number(body.tryoutId);
+    await this.tryoutsService.findOne(tryoutId);
+    if (body.mode !== 'replace' && body.mode !== 'append') throw new BadRequestException('Mode harus replace atau append');
+    if (body.mode === 'replace' && !body.force) {
+      const done = await this.resultsService.countByTryout(tryoutId);
+      if (done > 0) {
+        throw new BadRequestException(`Try out ini sudah dikerjakan ${done} kali. Mengganti soal akan membuat hasil & pembahasan lama tidak cocok. Centang konfirmasi untuk tetap mengganti.`);
+      }
+    }
+    return this.questionsService.importWord({ ...body, tryoutId });
   }
 
   // GET /questions?tryoutId=X&page=1&limit=50 — FIX #2: ada paginasi

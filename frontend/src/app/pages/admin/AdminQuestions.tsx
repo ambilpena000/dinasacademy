@@ -5,13 +5,23 @@ import {
   Save, ChevronDown, CheckCircle, AlertCircle, Filter, Upload
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
-import { api, adminApi } from '../../lib/api';
+import { api } from '../../lib/api';
+import WordImportModal from './WordImportModal';
+
+// Nama lengkap subtes (kode = yang dipakai halaman ujian untuk mengelompokkan soal)
+const SUBTEST_NAMES: Record<string, string> = {
+  PU: 'Penalaran Umum', PPU: 'Pengetahuan & Pemahaman Umum', KMBM: 'Kemampuan Memahami Bacaan & Menulis',
+  PK: 'Pengetahuan Kuantitatif', LBI: 'Literasi Bahasa Indonesia', LBE: 'Literasi Bahasa Inggris', PM: 'Penalaran Matematika',
+  TWK: 'Tes Wawasan Kebangsaan', TIU: 'Tes Intelegensia Umum', TKP: 'Tes Karakteristik Pribadi', MTK: 'Tes Matematika STIS',
+};
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Question {
   id: string;
   paket: 'SKD' | 'SNBT' | 'STIS' | '';
-  subject: string;
+  subject: string;      // kode subtes, mis. PU / TWK
+  subtestName?: string;
+  passage?: string;     // teks bacaan bersama (opsional)
   tryOutId: string;
   tryOutNumericId?: string; // actual backend id
   questionText: string;
@@ -28,7 +38,7 @@ interface BackendTryout {
 }
 
 const EMPTY_QUESTION: Question = {
-  id: '', paket: '', subject: '', tryOutId: '', tryOutNumericId: '',
+  id: '', paket: '', subject: '', subtestName: '', passage: '', tryOutId: '', tryOutNumericId: '',
   questionText: '',
   options: [{ id: 'a', text: '' }, { id: 'b', text: '' }, { id: 'c', text: '' }, { id: 'd', text: '' }],
   correctAnswer: '', explanation: '', tips: '',
@@ -114,26 +124,7 @@ export default function AdminQuestions() {
   // UI states
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const res = await adminApi.uploadQuestions(file);
-      showToast(`Berhasil mengimpor ${res.imported || 0} soal!`);
-      if (res.errors?.length > 0) {
-        console.warn('Import warnings:', res.errors);
-      }
-      fetchQuestions();
-    } catch (err: any) {
-      showToast(err?.message || 'Gagal mengimpor file', 'error');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
+  const [showWordImport, setShowWordImport] = useState(false);
 
   // ── Fetch data ────────────────────────────────────────────────────
   const fetchQuestions = React.useCallback(() => {
@@ -144,7 +135,9 @@ export default function AdminQuestions() {
         const mapped: Question[] = list.map((q: any) => ({
           id: String(q.id),
           paket: mapCategory(q.tryout?.category || q.category || ''),
-          subject: q.subtestName || q.subtestCode || '',
+          subject: q.subtestCode || q.subtestName || '',
+          subtestName: q.subtestName || '',
+          passage: q.passage || '',
           tryOutId: q.tryout?.title || (q.tryoutId ? String(q.tryoutId) : ''),
           tryOutNumericId: q.tryoutId ? String(q.tryoutId) : '',
           questionText: q.questionText,
@@ -197,10 +190,13 @@ export default function AdminQuestions() {
     if (form.options.some(o => !o.text.trim())) { showToast('Semua pilihan jawaban harus diisi!', 'error'); return; }
     if (!form.tryOutNumericId) { showToast('Pilih Try Out terlebih dahulu!', 'error'); return; }
 
-    const payload = {
+    const code = form.subject.trim().toUpperCase();
+    const keepName = editingQ && editingQ.subject.toUpperCase() === code && form.subtestName;
+    const payload: Record<string, any> = {
       tryoutId: Number(form.tryOutNumericId),
-      subtestCode: form.subject,
-      subtestName: form.subject,
+      subtestCode: code,
+      subtestName: SUBTEST_NAMES[code] || (keepName ? form.subtestName : code),
+      passage: form.passage?.trim() || null,
       questionText: form.questionText,
       optionA: form.options[0]?.text || '',
       optionB: form.options[1]?.text || '',
@@ -209,8 +205,9 @@ export default function AdminQuestions() {
       optionE: form.options[4]?.text || '',
       correctAnswer: form.correctAnswer,
       explanation: form.explanation,
-      orderIndex: 0,
     };
+    // Urutan soal hanya diisi saat membuat soal baru (edit tidak mengubah urutan)
+    if (!editingQ) payload.orderIndex = Date.now() % 1000000;
 
     setFormLoading(true);
     try {
@@ -287,21 +284,24 @@ export default function AdminQuestions() {
     <AdminLayout title="📝 Bank Soal" subtitle="Tambah, edit, dan kelola soal Try Out"
       actions={
         <div className="flex items-center gap-2.5">
-          <label className={`flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 text-[#2563EB] hover:bg-blue-50 text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-sm ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-            {uploading ? (
-              <svg className="animate-spin w-4 h-4 text-[#2563EB]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-            {uploading ? 'Mengimpor...' : 'Import PDF / JSON'}
-            <input type="file" accept=".pdf,.json" onChange={handleFileUpload} disabled={uploading} className="hidden" />
-          </label>
+          <button onClick={() => setShowWordImport(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 text-[#2563EB] hover:bg-blue-50 text-sm font-semibold rounded-xl transition-all shadow-sm">
+            <Upload className="w-4 h-4" /> Upload Word per Subtes
+          </button>
           <button onClick={() => { cancelForm(); setShowForm(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
             <Plus className="w-4 h-4" /> Tambah Soal
           </button>
         </div>
       }>
+
+      {showWordImport && (
+        <WordImportModal
+          tryouts={backendTryouts}
+          onClose={() => setShowWordImport(false)}
+          onImported={(msg) => { setShowWordImport(false); showToast(msg); fetchQuestions(); }}
+        />
+      )}
 
       <AnimatePresence>
         {deleteModal && (
@@ -373,12 +373,12 @@ export default function AdminQuestions() {
                 <div>
                   <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Mata Pelajaran / Subtes *</label>
                   <input type="text" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
-                    placeholder={form.paket === 'SKD' ? 'TWK / TIU / TKP' : form.paket === 'STIS' ? 'MTK' : form.paket === 'SNBT' ? 'Matematika / Penalaran Umum / Bahasa Indonesia / dll' : 'Mata pelajaran...'}
+                    placeholder={form.paket === 'SKD' ? 'TWK / TIU / TKP' : form.paket === 'STIS' ? 'MTK' : form.paket === 'SNBT' ? 'PU / PPU / KMBM / PK / LBI / LBE / PM' : 'Kode subtes...'}
                     className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none" />
                   {/* Quick pick subject */}
                   {form.paket && (
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      {(form.paket === 'SKD' ? ['TWK', 'TIU', 'TKP'] : form.paket === 'STIS' ? ['MTK'] : ['Matematika', 'Penalaran Umum', 'Bahasa Indonesia', 'Bahasa Inggris', 'Literasi', 'Kuantitatif']).map(s => (
+                      {(form.paket === 'SKD' ? ['TWK', 'TIU', 'TKP'] : form.paket === 'STIS' ? ['MTK'] : ['PU', 'PPU', 'KMBM', 'PK', 'LBI', 'LBE', 'PM']).map(s => (
                         <button key={s} type="button"
                           onClick={() => setForm({ ...form, subject: s })}
                           className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${form.subject === s ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-[#2563EB] hover:text-[#2563EB]'}`}>
@@ -387,6 +387,14 @@ export default function AdminQuestions() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Passage */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Teks Bacaan / Stimulus (opsional)</label>
+                  <textarea rows={3} value={form.passage || ''} onChange={e => setForm({ ...form, passage: e.target.value })}
+                    placeholder="Teks bacaan yang dipakai bersama beberapa soal. Pisahkan paragraf dengan baris kosong; baris tabel pakai ' | '."
+                    className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2563EB] outline-none resize-y" />
                 </div>
 
                 {/* Question Text */}

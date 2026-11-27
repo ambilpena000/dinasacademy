@@ -21,6 +21,10 @@ export class Question {
   @Column()
   subtestName!: string;
 
+  /** Teks bacaan / stimulus yang dipakai bersama beberapa soal (boleh kosong). */
+  @Column('text', { nullable: true })
+  passage?: string | null;
+
   @Column('text')
   questionText!: string;
 

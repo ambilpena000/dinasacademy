@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, XCircle, Lightbulb, PlayCircle, Loader2 } from 
 import { Card, CardContent } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
+import { QuestionContent } from '../components/QuestionContent';
 import { api } from '../lib/api';
 
 // FIX B1: Tidak ada mock data — semua dari backend + localStorage
@@ -49,6 +50,7 @@ export default function PembahasanPage() {
           id: String(q.id),
           index: i,
           questionText: q.questionText,
+          passage: q.passage || '',
           subject: q.subtestName || q.subtestCode,
           options: [
             { id: 'a', text: q.optionA },
@@ -182,7 +184,7 @@ export default function PembahasanPage() {
 
                   {/* Question Text */}
                   <div className="mb-6">
-                    <p className="text-lg text-gray-900 leading-relaxed">{question.questionText}</p>
+                    <QuestionContent className="text-lg text-gray-900" passage={question.passage} questionText={question.questionText} />
                   </div>
 
                   {/* Options */}

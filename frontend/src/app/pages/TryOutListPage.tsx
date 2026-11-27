@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useTryouts } from '../hooks/useTryouts';
 import { useAuth } from '../context/AuthContext';
-import { normalizeCategory, categoriesForPackage, categoryBadgeClass } from '../lib/category';
+import { normalizeCategory, categoryBadgeClass } from '../lib/category';
 
 export default function TryOutListPage() {
   const { user } = useAuth();
@@ -28,27 +28,6 @@ export default function TryOutListPage() {
     isCompleted: completedIds.includes(t.id) || t.isCompleted,
   }));
 
-  // Tentukan kategori yang bisa diakses berdasarkan paket
-  const allowedCategories = React.useMemo((): string[] => {
-    if (!user?.hasPurchasedPackage) return [];
-    return categoriesForPackage(user.packageType);
-  }, [user]);
-
-  // Hitung maxTryouts berdasarkan packageType dari backend (tanpa mock)
-  const maxTryouts = React.useMemo(() => {
-    if (!user?.packageType) return 0;
-    const pkg = (user.packageType || '').toLowerCase();
-    // Sesuaikan dengan getMaxTryouts() di backend tryouts.controller.ts
-    if (pkg.includes('premium') && (pkg.includes('snbt') || pkg.includes('ptn'))) return 15;
-    if (pkg.includes('standar') && (pkg.includes('snbt') || pkg.includes('ptn'))) return 8;
-    if (pkg.includes('basic')   && (pkg.includes('snbt') || pkg.includes('ptn'))) return 4;
-    if (pkg.includes('premium') && pkg.includes('skd'))  return 12;
-    if (pkg.includes('standar') && pkg.includes('skd'))  return 6;
-    if (pkg.includes('premium') && pkg.includes('stis')) return 10;
-    if (pkg.includes('combo')   || pkg.includes('lengkap')) return 999;
-    return 999; // paket tidak dikenal — tampilkan semua
-  }, [user]);
-
   // Label paket untuk header
   const packageLabel = React.useMemo(() => {
     if (!user?.hasPurchasedPackage) return null;
@@ -62,19 +41,10 @@ export default function TryOutListPage() {
     return user.packageType;
   }, [user]);
 
-  // Filter: sesuai kategori paket + search + batasi sesuai jumlah paket
-  const filteredTryOuts = React.useMemo(() => {
-    const byCategory = allTryouts.filter(t => {
-      const matchPackage = allowedCategories.includes(normalizeCategory(t.category) ?? '');
-      return matchPackage;
-    });
-    // Batasi sesuai jumlah paket (ambil yang pertama N)
-    const limited = byCategory.slice(0, maxTryouts);
-    // Lalu filter search
-    return limited.filter(t =>
-      t.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [allTryouts, allowedCategories, maxTryouts, searchQuery]);
+  // Backend sudah mengembalikan HANYA try out yang termasuk paket aktif peserta
+  const filteredTryOuts = React.useMemo(() =>
+    allTryouts.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase())),
+  [allTryouts, searchQuery]);
 
   const completedCount = filteredTryOuts.filter(t => t.isCompleted).length;
 
@@ -94,11 +64,11 @@ export default function TryOutListPage() {
           </div>
           <h3 className="text-xl font-bold text-gray-900 mb-2">Paket Belum Aktif</h3>
           <p className="text-gray-500 mb-6 max-w-sm mx-auto">
-            Beli paket terlebih dahulu untuk mengakses semua try out
+            Ambil paket terlebih dahulu — paket SNBT sedang GRATIS selama promo awal rilis
           </p>
           <Link to="/paket">
             <button className="px-6 py-3 bg-[#2563EB] text-white font-semibold rounded-xl hover:bg-[#1d4ed8] transition-all">
-              Lihat Pilihan Paket →
+              Ambil Paket Gratis →
             </button>
           </Link>
         </div>

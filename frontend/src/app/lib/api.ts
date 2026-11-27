@@ -88,6 +88,9 @@ export const api = {
   getMyOrders: () => request('/orders/my'),
   getAllOrders: () => request('/orders'),
   activateOrder: (id: string) => request(`/orders/${id}/activate`, { method: 'PUT' }),
+  // Paket gratis: langsung aktif tanpa pembayaran
+  claimFreePackage: (packageId: number) =>
+    request('/orders/claim-free', { method: 'POST', body: JSON.stringify({ packageId }) }),
   rejectOrder:   (id: string) => request(`/orders/${id}/reject`,   { method: 'PUT' }),
 
   // ── Try Outs ──────────────────────────────────────────────────────
@@ -202,4 +205,36 @@ export const adminApi = {
       return res.json();
     });
   },
+
+  // ── Impor soal dari Word (per subtes) ──────────────────────────────
+  previewWordImport: (file: File, tryoutId: string | number, subtestCode: string) => {
+    const token = localStorage.getItem('access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tryoutId', String(tryoutId));
+    formData.append('subtestCode', subtestCode);
+    return fetch(`${BASE_URL}/questions/import-word/preview`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(async res => {
+      if (res.status === 401) { handle401(); throw new Error('Sesi berakhir'); }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Gagal membaca file' }));
+        throw new Error(err.message || 'Gagal membaca file');
+      }
+      return res.json();
+    });
+  },
+  saveWordImport: (data: {
+    tryoutId: number; subtestCode: string; subtestName: string;
+    mode: 'replace' | 'append'; force?: boolean; questions: any[];
+  }) => request('/questions/import-word', { method: 'POST', body: JSON.stringify(data) }),
+
+  // ── Paket (gratis / berbayar) ──────────────────────────────────────
+  getPackagesAdmin: () => request('/packages/admin/all'),
+  createPackage: (data: any) => request('/packages', { method: 'POST', body: JSON.stringify(data) }),
+  updatePackage: (id: number | string, data: any) =>
+    request(`/packages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePackage: (id: number | string) => request(`/packages/${id}`, { method: 'DELETE' }),
 };

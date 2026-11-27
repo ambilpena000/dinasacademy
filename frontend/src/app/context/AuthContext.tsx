@@ -6,6 +6,7 @@ export interface Order {
   userId: string;
   userName: string;
   userEmail: string;
+  packageId?: number;
   packageType: 'PTN Premium' | 'SKD' | 'STIS';
   packageName: string;
   amount: number;
@@ -60,6 +61,7 @@ function mapOrder(o: any): Order {
     userId:        String(o.userId),
     userName:      o.user?.name   || o.userName  || '',
     userEmail:     o.user?.email  || o.userEmail || '',
+    packageId:     o.packageId ?? undefined,
     packageType:   o.packageType,
     packageName:   o.packageName,
     amount:        Number(o.amount),
@@ -240,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     order: Omit<Order, 'id' | 'createdAt' | 'status' | 'uniqueCode' | 'totalAmount'>
   ): Promise<Order> => {
     const saved = await api.createOrder({
+      packageId:     order.packageId,
       packageName:   order.packageName,
       packageType:   order.packageType,
       amount:        order.amount,

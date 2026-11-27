@@ -2,11 +2,20 @@
 // Dipakai oleh: daftar & detail try out, soal ujian, pembahasan, draft & submit ujian.
 import { normalizeCategory } from './category';
 
+/** Hak akses dari satu paket aktif milik user (hasil pesanan berstatus "active"). */
+export interface Entitlement {
+  packageType?: string | null;
+  /** Try out yang dipilih admin untuk paket ini. Kosong = semua try out sesuai kategori paket. */
+  tryoutIds?: number[];
+}
+
 export interface AccessUser {
   id?: number;
   role?: string;
   hasPurchasedPackage?: boolean;
   packageType?: string | null;
+  /** Paket-paket aktif user. Bila diisi, akses = gabungan semua paket ini. */
+  entitlements?: Entitlement[];
 }
 
 export interface AccessTryout {
@@ -49,9 +58,25 @@ export function maxTryouts(packageType?: string | null): number {
  */
 export function accessibleTryouts<T extends AccessTryout>(user: AccessUser | undefined, all: T[]): T[] {
   if (user?.role === 'admin') return all;
+  if (user?.entitlements?.length) {
+    const allowed = new Set<number>();
+    for (const e of user.entitlements) {
+      for (const t of fromEntitlement(e, all)) allowed.add(t.id);
+    }
+    return all.filter((t) => allowed.has(t.id));
+  }
   if (!user?.hasPurchasedPackage || !user?.packageType) return [];
-  const cats = allowedCategories(user.packageType);
-  return all
-    .filter((t) => cats.includes(normalizeCategory(t.category) ?? '') && t.isActive !== false)
-    .slice(0, maxTryouts(user.packageType));
+  return fromEntitlement({ packageType: user.packageType }, all);
+}
+
+function fromEntitlement<T extends AccessTryout>(e: Entitlement, all: T[]): T[] {
+  const active = all.filter((t) => t.isActive !== false);
+  if (e.tryoutIds?.length) {
+    const ids = new Set(e.tryoutIds.map(Number));
+    return active.filter((t) => ids.has(t.id));
+  }
+  const cats = allowedCategories(e.packageType);
+  return active
+    .filter((t) => cats.includes(normalizeCategory(t.category) ?? ''))
+    .slice(0, maxTryouts(e.packageType));
 }

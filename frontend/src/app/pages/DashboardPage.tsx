@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTryouts } from '../hooks/useTryouts';
 import { useResults } from '../hooks/useResults';
 import { api } from '../lib/api';
-import { normalizeCategory, categoriesForPackage, categoryBadgeClass } from '../lib/category';
+import { normalizeCategory, categoryBadgeClass } from '../lib/category';
 
 export default function DashboardPage() {
   const { user: authUser, refreshUser } = useAuth();
@@ -37,31 +37,15 @@ export default function DashboardPage() {
     return raw ? JSON.parse(raw) : [];
   }, []);
 
-  // Hitung max tryout sesuai paket dari backend database
-  const maxTryouts = React.useMemo(() => {
-    if (!authUser?.packageType) return 0;
-    const pkg = packages.find(p =>
-      p.name?.toLowerCase() === (authUser.packageType || '').toLowerCase() ||
-      (authUser.packageType || '').toLowerCase().includes(p.name?.toLowerCase().split(' ')[1]?.toLowerCase() || '')
-    );
-    return pkg?.includedTryouts || pkg?.includedTryOuts || 999;
-  }, [authUser, packages]);
-
-  // Filter tryout sesuai kategori paket
-  const allowedCategories = React.useMemo((): string[] => {
-    if (!authUser?.hasPurchasedPackage) return [];
-    return categoriesForPackage(authUser.packageType);
-  }, [authUser]);
-
+  // Backend sudah mengembalikan HANYA try out yang termasuk paket aktif peserta
+  // (gabungan paket gratis & berbayar, sesuai pilihan try out admin per paket).
   const mergedTryOuts = React.useMemo(() => {
-    return backendTryouts
-      .filter(t => allowedCategories.includes(normalizeCategory(t.category) ?? ''))
-      .slice(0, maxTryouts)
-      .map(t => ({
-        ...t,
-        isCompleted: completedIds.includes(t.id) || t.isCompleted,
-      }));
-  }, [backendTryouts, allowedCategories, maxTryouts, completedIds]);
+    if (!authUser?.hasPurchasedPackage) return [];
+    return backendTryouts.map(t => ({
+      ...t,
+      isCompleted: completedIds.includes(t.id) || t.isCompleted,
+    }));
+  }, [backendTryouts, authUser, completedIds]);
 
   const upcomingTryOuts = mergedTryOuts.filter(t => !t.isCompleted && !t.isLocked).slice(0, 2);
   const completedCount = mergedTryOuts.filter(t => t.isCompleted).length;
@@ -106,7 +90,7 @@ export default function DashboardPage() {
                   whileTap={{ scale: 0.98 }}
                   className="bg-white text-[#2563EB] text-sm font-bold px-5 py-2 rounded-xl shadow-sm"
                 >
-                  Beli Paket Sekarang →
+                  Ambil Paket GRATIS →
                 </motion.button>
               </Link>
             )}
@@ -335,7 +319,7 @@ export default function DashboardPage() {
                 {!authUser?.hasPurchasedPackage && (
                   <Link to="/paket">
                     <button className="mt-3 px-4 py-2 text-sm font-semibold text-[#2563EB] bg-blue-50 rounded-xl hover:bg-blue-100 transition-all">
-                      Beli Paket →
+                      Ambil Paket Gratis →
                     </button>
                   </Link>
                 )}

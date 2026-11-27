@@ -12,6 +12,8 @@ async function bootstrap() {
     // Tolak start di production bila secret/password masih bawaan
     assertProductionConfig();
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    // Impor soal dari Word mengirim teks bacaan untuk tiap soal → perlu batas JSON lebih besar dari 100 KB
+    app.useBodyParser('json', { limit: '5mb' });
     const config = app.get(ConfigService);
 
     // FRONTEND_URL boleh berisi beberapa alamat dipisah koma,

@@ -14,9 +14,13 @@ import { Badge } from '../components/Badge';
 import { Input } from '../components/Input';
 import { Footer } from '../components/Footer';
 import { api } from '../lib/api';
+import { mapPackage, rupiah, isSnbtPackage } from '../lib/packages';
+import { PackagePrice, PromoRibbon } from '../components/PackagePrice';
 
 export default function PaketPage() {
-  const { user, purchasePackage, addOrder, refreshUser } = useAuth();
+  const { user, addOrder, refreshUser, refreshOrders, orders } = useAuth();
+  const [claiming, setClaiming] = useState<string | null>(null);
+  const [claimMessage, setClaimMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packageIdFromUrl = searchParams.get('package');
@@ -36,27 +40,14 @@ export default function PaketPage() {
     api.getPackages()
       .then((data: any[]) => {
         // Map format backend → format yang dipakai komponen
-        const mapped = data.map((p: any) => ({
-          id:              String(p.id),
-          name:            p.name,
-          track:           p.track,
-          type:            p.type || p.track,
-          price:           Number(p.price),
-          duration:        typeof p.duration === 'number'
-            ? (p.duration >= 360 ? '12 bulan' : p.duration >= 170 ? '6 bulan' : p.duration >= 80 ? '3 bulan' : `${p.duration} hari`)
-            : (typeof p.duration === 'string' ? p.duration : '12 bulan'),
-          description:     p.description,
-          features:        Array.isArray(p.features) ? p.features : [],
-          includedTryOuts: Array.isArray(p.includedTryouts)
-            ? p.includedTryouts.length
-            : (typeof p.includedTryOuts === 'number' ? p.includedTryOuts : 0),
-          isPopular:       false, // backend belum punya field ini; set manual jika perlu
-        }));
-        // Tandai paket pertama per kategori sebagai popular
+        const mapped = data.map(mapPackage);
+        // Tandai paket berbayar pertama per kategori sebagai "terbaik" (paket gratis memakai pita promo)
         ['PTN', 'Sekdin'].forEach(track => {
-          const first = mapped.find((p: any) => p.track === track);
+          const first = mapped.find((p) => p.track === track && !p.isFree);
           if (first) first.isPopular = true;
         });
+        const firstCat = mapped.find((p) => isSnbtPackage(p)) ? 'SNBT' : mapped.find((p) => p.name.includes('Combo')) ? 'COMBO' : 'SEKDIN';
+        setSelectedCategory(firstCat);
         setPackages(mapped);
         if (mapped.length > 0) setSelectedPackage(mapped[0]);
       })
@@ -96,31 +87,47 @@ export default function PaketPage() {
     if (selectedCategory === 'COMBO') {
       return packages.filter((p: any) => p.name.includes('Combo'));
     } else if (selectedCategory === 'SNBT') {
-      return packages.filter((p: any) => p.track === 'PTN');
+      return packages.filter((p: any) => isSnbtPackage(p) && !p.name.includes('Combo'));
     } else {
-      return packages.filter((p: any) => p.track === 'Sekdin');
+      return packages.filter((p: any) => !isSnbtPackage(p) && !p.name.includes('Combo'));
     }
   };
+
+  // Tab kategori hanya untuk kategori yang punya paket aktif
+  const availableCategories = (['SNBT', 'SEKDIN', 'COMBO'] as const).filter((c) =>
+    c === 'COMBO' ? packages.some((p: any) => p.name.includes('Combo'))
+      : c === 'SNBT' ? packages.some((p: any) => isSnbtPackage(p) && !p.name.includes('Combo'))
+      : packages.some((p: any) => !isSnbtPackage(p) && !p.name.includes('Combo')));
+  const hasFreePackage = packages.some((p: any) => p.isFree);
 
   const filteredPackages = getFilteredPackages();
   const popularPackages = filteredPackages.filter(p => p.isPopular);
   const otherPackages = filteredPackages.filter(p => !p.isPopular);
 
   // Check if package is subscribed
-  const isPackageSubscribed = (packageName: string) => {
-    if (!user?.hasPurchasedPackage || !user?.packageType) return false;
-    
-    if (packageName.includes('PTN') && user.packageType === 'PTN Premium') return true;
-    if (packageName.includes('SKD') && user.packageType === 'SKD') return true;
-    if (packageName.includes('STIS') && user.packageType === 'STIS') return true;
-    
-    return false;
-  };
+  const isPackageSubscribed = (pkg: any) =>
+    orders.some((o) => o.status === 'active' && o.packageName === pkg.name);
 
-  const handleSelectPackage = (pkg: any) => {
-    if (isPackageSubscribed(pkg.name)) return;
-    setSelectedPackage(pkg);
-    setCheckoutMode(true);
+  // Paket gratis: langsung aktif tanpa pembayaran. Paket berbayar: ke halaman pembayaran.
+  const handleSelectPackage = async (pkg: any) => {
+    if (isPackageSubscribed(pkg)) return;
+    if (!pkg.isFree) {
+      setSelectedPackage(pkg);
+      setCheckoutMode(true);
+      return;
+    }
+    setClaiming(pkg.id);
+    setClaimMessage(null);
+    try {
+      await api.claimFreePackage(pkg.rawId);
+      await Promise.all([refreshUser(), refreshOrders()]);
+      setClaimMessage({ type: 'ok', text: `🎉 ${pkg.name} berhasil diaktifkan GRATIS! Mengarahkan ke Try Out...` });
+      setTimeout(() => navigate('/tryout'), 1500);
+    } catch (err: any) {
+      setClaimMessage({ type: 'error', text: err?.message || 'Gagal mengambil paket gratis. Coba lagi.' });
+    } finally {
+      setClaiming(null);
+    }
   };
 
 
@@ -180,7 +187,8 @@ export default function PaketPage() {
         userId: String(user?.id || ''),
         userName: user?.name || '',
         userEmail: user?.email || '',
-        packageType: getPackageType(),
+        packageId: selectedPackage.rawId,
+        packageType: selectedPackage.type || getPackageType(),
         packageName: selectedPackage.name,
         amount: total,
         paymentMethod,
@@ -225,7 +233,15 @@ export default function PaketPage() {
     );
   }
 
-  if (!selectedPackage) return null;
+  if (!packagesError && packages.length === 0) {
+    return (
+      <div className="text-center py-24 px-4">
+        <h3 className="text-lg font-bold text-gray-900 mb-2">Belum ada paket tersedia</h3>
+        <p className="text-sm text-gray-500">Paket akan segera dibuka. Pantau terus ya!</p>
+      </div>
+    );
+  }
+  if (!selectedPackage && !packagesError) return null;
 
   // BUG FIX A1: Tampilkan error state jika backend gagal — bukan data palsu
   if (packagesError) {
@@ -282,7 +298,7 @@ export default function PaketPage() {
                         {selectedPackage.isPopular && <Badge variant="yellow">Popular</Badge>}
                       </div>
                       <p className="text-sm text-gray-600 mb-2">
-                        {selectedPackage.includedTryOuts} Try Out + Pembahasan Lengkap
+                        {selectedPackage.tryoutLabel} + Pembahasan Lengkap
                       </p>
                       <Badge variant={selectedPackage.track === 'PTN' ? 'blue' : 'purple'}>
                         {selectedPackage.type || selectedPackage.track}
@@ -290,7 +306,7 @@ export default function PaketPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-[#2563EB]">
-                        Rp {(selectedPackage.price / 1000).toFixed(0)}K
+                        {rupiah(selectedPackage.price)}
                       </p>
                     </div>
                   </div>
@@ -546,6 +562,20 @@ export default function PaketPage() {
             Persiapkan dirimu dengan try out berbasis CAT untuk diterima di <span className="font-bold text-[#FBBF24]">kampus impianmu</span>!
           </motion.p>
 
+          {hasFreePackage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.45 }}
+              className="inline-flex flex-wrap items-center gap-2 bg-white text-gray-900 rounded-2xl px-5 py-3 mb-8 shadow-xl"
+            >
+              <Gift className="w-6 h-6 text-red-500" />
+              <span className="font-bold">Promo Awal Rilis:</span>
+              <span>Paket SNBT <span className="line-through text-gray-400">Rp49.000</span></span>
+              <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-red-500 to-orange-400 text-white font-black">GRATIS</span>
+            </motion.div>
+          )}
+
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -579,15 +609,15 @@ export default function PaketPage() {
       >
         <div className="text-center mb-6">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-            Pilih Jalur Impianmu
+            {hasFreePackage ? 'Program Gratis Persiapan SNBT' : 'Pilih Jalur Impianmu'}
           </h2>
           <p className="text-gray-600">
-            Kami punya program khusus untuk setiap tujuanmu
+            {hasFreePackage ? 'Ambil paketnya sekarang — langsung aktif tanpa pembayaran selama promo berlaku' : 'Kami punya program khusus untuk setiap tujuanmu'}
           </p>
         </div>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <button
+          {availableCategories.length > 1 && availableCategories.includes('SNBT') && <button
             onClick={() => setSelectedCategory('SNBT')}
             className={`group relative px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 ${
               selectedCategory === 'SNBT'
@@ -603,9 +633,9 @@ export default function PaketPage() {
               />
             )}
             <span className="relative z-10">SNBT/UTBK</span>
-          </button>
+          </button>}
 
-          <button
+          {availableCategories.length > 1 && availableCategories.includes('SEKDIN') && <button
             onClick={() => setSelectedCategory('SEKDIN')}
             className={`group relative px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 ${
               selectedCategory === 'SEKDIN'
@@ -621,9 +651,9 @@ export default function PaketPage() {
               />
             )}
             <span className="relative z-10">SEKDIN</span>
-          </button>
+          </button>}
 
-          <button
+          {availableCategories.length > 1 && availableCategories.includes('COMBO') && <button
             onClick={() => setSelectedCategory('COMBO')}
             className={`group relative px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 ${
               selectedCategory === 'COMBO'
@@ -639,14 +669,19 @@ export default function PaketPage() {
               />
             )}
             <span className="relative z-10">COMBO</span>
-          </button>
+          </button>}
         </div>
       </motion.div>
 
       {/* Package Cards - Compact Grid Layout */}
-      <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-5">
+      {claimMessage && (
+        <div className={`max-w-xl mx-auto rounded-xl px-4 py-3 text-sm font-semibold text-center ${claimMessage.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {claimMessage.text}
+        </div>
+      )}
+      <div className={`mx-auto grid gap-5 ${filteredPackages.length === 1 ? 'max-w-sm' : 'max-w-3xl md:grid-cols-2'}`}>
         {filteredPackages.map((pkg, index) => {
-          const isSubscribed = isPackageSubscribed(pkg.name);
+          const isSubscribed = isPackageSubscribed(pkg);
           const isBest = pkg.isPopular;
           const isHighlighted = packageIdFromUrl === pkg.id;
           
@@ -671,6 +706,8 @@ export default function PaketPage() {
                     : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
                 }`}
               >
+                {pkg.isFree && !isSubscribed && <PromoRibbon />}
+
                 {/* Best Badge - Simple */}
                 {isBest && (
                   <div className="absolute top-3 right-3 z-10">
@@ -714,25 +751,11 @@ export default function PaketPage() {
                     </p>
                   </div>
 
-                  {/* Pricing - Compact */}
-                  <div className="text-center mb-4 pb-4 border-b border-gray-200">
-                    <div className="flex items-baseline justify-center space-x-1 mb-0.5">
-                      <span className="text-3xl font-black bg-gradient-to-r from-[#2563EB] to-[#3B82F6] bg-clip-text text-transparent">
-                        {(pkg.price / 1000).toFixed(0)}K
-                      </span>
-                      <span className="text-gray-500 text-sm font-medium">
-                        /{pkg.duration}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      <span className="line-through">Rp {((pkg.price * 1.3) / 1000).toFixed(0)}K</span>
-                      <span className="ml-1 text-green-600 font-semibold">-30%</span>
-                    </p>
-                  </div>
+                  <PackagePrice pkg={pkg} />
 
                   {/* Features - Compact */}
                   <div className="space-y-2 mb-4">
-                    {pkg.features.slice(0, 4).map((feature, idx) => (
+                    {pkg.features.slice(0, 4).map((feature: string, idx: number) => (
                       <div
                         key={idx}
                         className="flex items-start space-x-2"
@@ -761,7 +784,7 @@ export default function PaketPage() {
                         <div>
                           <p className="text-xs text-gray-600 font-medium leading-none mb-0.5">Try Out</p>
                           <p className="text-sm font-black text-[#2563EB] leading-none">
-                            {pkg.includedTryOuts} Paket
+                            {pkg.tryoutLabel}
                           </p>
                         </div>
                       </div>
@@ -778,26 +801,12 @@ export default function PaketPage() {
                         : 'bg-[#2563EB] hover:bg-[#1D4ED8] border-none'
                     }`}
                     onClick={() => !isSubscribed && handleSelectPackage(pkg)}
-                    disabled={isSubscribed}
+                    disabled={isSubscribed || claiming === pkg.id}
                   >
                     <span className="text-sm font-bold">
-                      {isSubscribed ? '✓ Sudah Berlangganan' : 'Pilih Paket'}
+                      {isSubscribed ? '✓ Paket Aktif' : claiming === pkg.id ? 'Mengaktifkan...' : pkg.isFree ? 'Ambil Gratis Sekarang' : 'Pilih Paket'}
                     </span>
                   </Button>
-
-                  {/* Social Proof - Mini */}
-                  {!isSubscribed && (
-                    <div className="mt-3 text-center">
-                      <div className="flex items-center justify-center space-x-0.5 mb-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className="w-3 h-3 text-yellow-400 fill-current" />
-                        ))}
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        <span className="font-bold text-gray-900">{2000 + (index * 300)}+</span> siswa
-                      </p>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -816,7 +825,7 @@ export default function PaketPage() {
           {
             icon: Play,
             title: 'Akses Instan',
-            description: 'Langsung belajar setelah pembayaran berhasil',
+            description: hasFreePackage ? 'Paket gratis langsung aktif tanpa menunggu konfirmasi' : 'Langsung belajar setelah pembayaran berhasil',
             color: 'from-blue-500 to-indigo-500'
           },
           {

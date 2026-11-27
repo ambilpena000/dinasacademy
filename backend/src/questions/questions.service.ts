@@ -4,6 +4,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from './question.entity';
+import { ParsedQuestion, isValidQuestion } from './word-import';
+
+// Urutan subtes per kategori — dipakai untuk orderIndex soal hasil impor (subtes × 1000 + nomor)
+const SUBTEST_ORDER = ['PU', 'PPU', 'KMBM', 'PBM', 'PK', 'LBI', 'LBE', 'PM', 'TWK', 'TIU', 'TKP', 'MTK'];
+
+export interface ImportWordDto {
+  tryoutId: number;
+  subtestCode: string;
+  subtestName?: string;
+  mode: 'replace' | 'append';
+  force?: boolean;
+  questions: ParsedQuestion[];
+}
 
 // ── Paginasi DTO ───────────────────────────────────────────────────
 export interface PaginatedResult<T> {
@@ -62,6 +75,54 @@ export class QuestionsService {
     const question = await this.findOne(id);
     await this.questionRepo.remove(question);
     return { deleted: true };
+  }
+
+  /** Jumlah soal yang sudah ada untuk satu subtes di try out. */
+  async countSubtest(tryoutId: number, subtestCode: string) {
+    return this.questionRepo.count({ where: { tryoutId, subtestCode } });
+  }
+
+  /**
+   * Simpan soal hasil baca Word untuk SATU subtes.
+   *   replace → soal lama subtes ini dihapus lalu diganti; append → ditambahkan di akhir.
+   * Semua dalam satu transaksi: gagal satu, tidak ada yang tersimpan.
+   */
+  async importWord(dto: ImportWordDto): Promise<{ imported: number; replaced: number; skipped: number[] }> {
+    const subtestCode = String(dto.subtestCode || '').trim().toUpperCase();
+    if (!subtestCode) throw new BadRequestException('Subtes wajib dipilih');
+    if (!Array.isArray(dto.questions) || !dto.questions.length) throw new BadRequestException('Tidak ada soal untuk disimpan');
+    const valid = dto.questions.filter(isValidQuestion);
+    const skipped = dto.questions.filter((q) => !isValidQuestion(q)).map((q) => q.number);
+    if (!valid.length) throw new BadRequestException('Semua soal belum lengkap (opsi minimal A–D dan kunci jawaban wajib)');
+
+    const rank = SUBTEST_ORDER.indexOf(subtestCode);
+    const base = (rank < 0 ? 90 : rank + 1) * 1000;
+
+    return this.questionRepo.manager.transaction(async (em) => {
+      const repo = em.getRepository(Question);
+      let replaced = 0;
+      let start = base;
+      if (dto.mode === 'replace') {
+        replaced = (await repo.delete({ tryoutId: dto.tryoutId, subtestCode })).affected || 0;
+      } else {
+        const last = await repo.findOne({ where: { tryoutId: dto.tryoutId, subtestCode }, order: { orderIndex: 'DESC' } });
+        if (last) start = Math.max(base, last.orderIndex + 1);
+      }
+      const opt = (q: ParsedQuestion, i: number) => String(q.options[i] ?? '').trim();
+      const rows = valid.map((q, i) => repo.create({
+        tryoutId: dto.tryoutId,
+        subtestCode,
+        subtestName: String(dto.subtestName || subtestCode),
+        passage: q.passage?.trim() || null,
+        questionText: String(q.questionText).trim(),
+        optionA: opt(q, 0), optionB: opt(q, 1), optionC: opt(q, 2), optionD: opt(q, 3), optionE: opt(q, 4),
+        correctAnswer: String(q.correctAnswer).toLowerCase(),
+        explanation: q.explanation?.trim() || undefined,
+        orderIndex: start + i,
+      }));
+      await repo.save(rows, { chunk: 50 });
+      return { imported: rows.length, replaced, skipped };
+    });
   }
 
   // ── FIX #3: processFile benar-benar memproses JSON & PDF ──────────
