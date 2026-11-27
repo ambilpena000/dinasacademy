@@ -477,7 +477,7 @@ export default function PaketPage() {
 
                 {/* Selalu tampilkan tombol WA — klik buka WA, saat kembali card konfirmasi muncul */}
                 <a
-                  href={`https://wa.me/6289520074667?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konfirmasi%20pembayaran%20%F0%9F%8E%AF%0A%0APaket%3A%20*${encodeURIComponent(selectedPackage?.name || '')}*%0AMetode%3A%20${paymentMethod === 'transfer' ? 'Transfer%20Bank%20BCA' : 'E-Wallet'}%0ANominal%3A%20*Rp%20${totalTransfer.toLocaleString('id-ID')}*%0AKode%20Unik%3A%20*${uniqueCode}*%0A%0ANama%3A%20${encodeURIComponent(user?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
+                  href={`https://wa.me/6282244135283?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konfirmasi%20pembayaran%20%F0%9F%8E%AF%0A%0APaket%3A%20*${encodeURIComponent(selectedPackage?.name || '')}*%0AMetode%3A%20${paymentMethod === 'transfer' ? 'Transfer%20Bank%20BCA' : 'E-Wallet'}%0ANominal%3A%20*Rp%20${totalTransfer.toLocaleString('id-ID')}*%0AKode%20Unik%3A%20*${uniqueCode}*%0A%0ANama%3A%20${encodeURIComponent(user?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleConfirmViaWA}
@@ -873,7 +873,7 @@ export default function PaketPage() {
               </p>
               <div className="flex items-center justify-center">
                 <a
-                  href="https://wa.me/6289520074667?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konsultasi%20pilihan%20paket"
+                  href="https://wa.me/6282244135283?text=Halo%20Dinas%20Academy,%20saya%20ingin%20konsultasi%20pilihan%20paket"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
