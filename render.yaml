@@ -1,5 +1,6 @@
-# render.yaml — Blueprint backend Dinas Academy untuk Render (paket GRATIS).
-# Render → New → Blueprint → pilih repo ini. Panduan: DEPLOY-GRATIS.md
+# render.yaml — Konfigurasi backend Dinas Academy untuk Render (paket GRATIS).
+# Catatan: menu "New → Blueprint" di Render meminta kartu kredit. Tanpa kartu, buat lewat
+# "New → Web Service" dengan isian yang sama seperti file ini — lihat DEPLOY-GRATIS.md langkah 3.
 #
 # Catatan paket gratis Render:
 #  - Backend "tidur" setelah 15 menit tanpa pengunjung; bangun ±1 menit saat diakses lagi.

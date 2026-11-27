@@ -78,17 +78,47 @@ rm dinasacademy.dump
 
 ## Langkah 3 — Backend di Render
 
+> **Jangan pakai menu "Blueprint"** — menu itu meminta kartu kredit. Buat lewat **New → Web Service**
+> seperti di bawah; layanan gratis bisa berjalan tanpa kartu.
+
 1. Buka [render.com](https://render.com) → **Get Started** (pakai GitHub) → izinkan akses ke repo `dinasacademy`.
-2. **New** → **Blueprint** → pilih repo `ambilpena000/dinasacademy`. Render membaca file [`render.yaml`](render.yaml).
-3. Isi 2 variabel yang diminta:
-   - `DATABASE_URL` = `NEON_URL`
-   - `FRONTEND_URL` = `https://dinasacademy.pages.dev` (alamat website di langkah 4; ubah bila nama proyek berbeda)
-4. **Apply**. Build pertama ± 5–10 menit. `JWT_SECRET` dibuat acak otomatis oleh Render.
-5. Catat alamat backend di halaman service, mis. `https://dinasacademy-api.onrender.com`.
+2. Buat `JWT_SECRET` dulu di Git Bash laptop, salin hasilnya:
+   ```bash
+   openssl rand -hex 48
+   ```
+3. **New** → **Web Service** → pilih repo `ambilpena000/dinasacademy`, lalu isi:
+
+   | Isian | Nilai |
+   |---|---|
+   | Name | `dinasacademy-api` → alamat menjadi `https://dinasacademy-api.onrender.com` |
+   | Region | **Singapore** (bila tidak ada untuk paket gratis, pilih yang tersedia) |
+   | Branch | `main` |
+   | Root Directory | `backend` |
+   | Runtime / Language | `Node` |
+   | Build Command | `npm ci --include=dev && npm run build` |
+   | Start Command | `node dist/main` |
+   | Instance Type | **Free** |
+
+4. Bagian **Environment Variables** → tambahkan:
+
+   | Key | Value |
+   |---|---|
+   | `NODE_ENV` | `production` |
+   | `NODE_VERSION` | `20` |
+   | `DATABASE_URL` | `NEON_URL` (connection string Neon) |
+   | `JWT_SECRET` | hasil `openssl rand -hex 48` dari langkah 2 |
+   | `JWT_EXPIRES_IN` | `7d` |
+   | `FRONTEND_URL` | `https://dinasacademy.pages.dev` (alamat website di langkah 4; ubah bila nama proyek berbeda) |
+
+5. Buka **Advanced** → **Health Check Path** = `/api/health`.
+6. **Create Web Service**. Build pertama ± 5–10 menit (lihat tab **Logs**, tunggu tulisan `Backend berjalan`).
+7. Catat alamat backend di halaman service, mis. `https://dinasacademy-api.onrender.com`.
    Cek di browser: `https://dinasacademy-api.onrender.com/api/health` → `{"status":"ok", …}`.
 
-> Bila region **Singapore** tidak tersedia untuk paket gratis, pilih region yang ada lalu hapus baris
-> `region:` di `render.yaml` (atau ubah region di dashboard). Website tetap berjalan, hanya sedikit lebih lambat.
+> Masih diminta kartu walau lewat **Web Service**? Render kadang meminta verifikasi kartu dengan biaya
+> uji $1 yang dikembalikan. **Kartu debit** berlogo Visa/Mastercard (termasuk kartu debit virtual dari
+> aplikasi bank digital) biasanya diterima — tidak harus kartu kredit. Selama Instance Type **Free**,
+> tidak ada tagihan bulanan.
 
 ## Langkah 4 — Website di Cloudflare Pages
 
