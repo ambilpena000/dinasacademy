@@ -19,7 +19,7 @@ Peserta ──► https://dinasacademy.pages.dev          (Website — Cloudflar
 | Backend | [Render](https://render.com) | Tidur setelah 15 menit tanpa pengunjung, bangun ±1 menit (diatasi di langkah 5); 750 jam/bulan; tanpa akses shell |
 | Website | [Cloudflare Pages](https://pages.cloudflare.com) | 500 build/bulan; bandwidth tanpa batas |
 
-Siapkan: akun **GitHub `ambilpena000`** (kode sudah di-*push*), PowerShell, dan PostgreSQL 16 di laptop (sudah ada).
+Siapkan: akun **GitHub `ambilpena000`** (kode sudah di-*push*), terminal **Git Bash**, dan PostgreSQL 16 di laptop (sudah ada).
 Semua layanan bisa daftar memakai akun GitHub — tanpa kartu kredit.
 
 ---
@@ -40,31 +40,35 @@ Semua layanan bisa daftar memakai akun GitHub — tanpa kartu kredit.
 
 ## Langkah 2 — Pindahkan database laptop ke Neon
 
-Di **PowerShell** laptop, dari folder proyek:
+Semua perintah di panduan ini untuk terminal **Git Bash**, dijalankan dari folder proyek
+(`/c/Kerja/Ambil pena/New folder/dinasacademy`).
 
-```powershell
-# a. Backup database lokal
-& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -h localhost -U postgres -d dinasacademy -Fc -f dinasacademy.dump
+> Selalu tulis `NEON_URL` di dalam tanda kutip **tunggal** `'...'`, agar karakter khusus
+> (`&`, `?`, `!`, `$`) di connection string atau password tidak diubah oleh Bash.
 
-# b. Restore ke Neon (ganti NEON_URL dengan connection string dari langkah 1, tetap di dalam tanda kutip)
-& "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe" --no-owner --no-acl -d "NEON_URL" dinasacademy.dump
+```bash
+# a. Backup database lokal (diminta password PostgreSQL laptop)
+"/c/Program Files/PostgreSQL/16/bin/pg_dump.exe" -h localhost -U postgres -d dinasacademy -Fc -f dinasacademy.dump
+
+# b. Restore ke Neon (ganti NEON_URL dengan connection string dari langkah 1, tetap di dalam kutip tunggal)
+"/c/Program Files/PostgreSQL/16/bin/pg_restore.exe" --no-owner --no-acl -d 'NEON_URL' dinasacademy.dump
 ```
 
 Peringatan kecil soal `extension` / `comment` boleh diabaikan.
 
-```powershell
-# c. Ganti password admin & hapus akun peserta uji — perintah dijalankan dari laptop ke Neon
+```bash
+# c. Ganti password admin & hapus akun peserta uji — dijalankan dari laptop ke Neon
 cd backend
-$env:DATABASE_URL = "NEON_URL"
-$env:ADMIN_PASSWORD = "GantiDenganPasswordKuat#2026"
+export DATABASE_URL='NEON_URL'
+export ADMIN_PASSWORD='GantiDenganPasswordKuat#2026'
 npm run seed:admin -- --reset-password
 npm run reset:participants              # tampilkan dulu daftar akun uji (budi, bagas, …)
 npm run reset:participants -- --yes     # hapus akun uji beserta pesanan & hasilnya
 
 # d. PENTING: hapus variabel agar backend lokal kembali memakai database laptop
-Remove-Item Env:DATABASE_URL; Remove-Item Env:ADMIN_PASSWORD
+unset DATABASE_URL ADMIN_PASSWORD
 cd ..
-Remove-Item dinasacademy.dump
+rm dinasacademy.dump
 ```
 
 ## Langkah 3 — Backend di Render
@@ -135,22 +139,25 @@ migrasi database berjalan sendiri saat backend start.
 
 ## Perintah admin (dijalankan dari laptop ke Neon)
 
-Render gratis tidak punya shell, jadi jalankan dari folder `backend` di PowerShell:
+Render gratis tidak punya shell, jadi jalankan dari folder `backend` di Git Bash:
 
-```powershell
-$env:DATABASE_URL = "NEON_URL"
-npm run seed:admin -- --reset-password     # ganti password admin (pakai $env:ADMIN_PASSWORD)
+```bash
+cd backend
+export DATABASE_URL='NEON_URL'
+export ADMIN_PASSWORD='PasswordBaruYangKuat#2026'
+npm run seed:admin -- --reset-password     # ganti password admin
 npm run rescore                            # hitung ulang skor & peringkat
 npm run seed:universities                  # perbarui data PTN/prodi SNPMB
-Remove-Item Env:DATABASE_URL               # selalu hapus setelah selesai
+unset DATABASE_URL ADMIN_PASSWORD          # selalu hapus setelah selesai
+cd ..
 ```
 
 ## Backup
 
 Neon menyimpan riwayat singkat, tapi tetap buat backup sendiri (mis. tiap minggu):
 
-```powershell
-& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -Fc -f "backup-$(Get-Date -Format yyyyMMdd).dump" "NEON_URL"
+```bash
+"/c/Program Files/PostgreSQL/16/bin/pg_dump.exe" -Fc -f "backup-$(date +%Y%m%d).dump" 'NEON_URL'
 ```
 
 ## Kapan perlu pindah ke paket berbayar / VPS?

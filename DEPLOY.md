@@ -20,7 +20,7 @@ Peserta ──► https://dinasacademy.com ──► Caddy (HTTPS)
 | Domain (`.com` / `.id`) | Beli di penyedia yang sama dengan VPS, atau [Hostinger](https://www.hostinger.com/id/domain) | ± Rp110.000–250.000 / tahun |
 | SSL / HTTPS | Otomatis oleh Caddy (Let's Encrypt) | Gratis |
 
-Di komputer Anda: **PowerShell** (sudah ada `ssh` & `scp`), PostgreSQL 16 lokal (sudah terpasang),
+Di komputer Anda: **Git Bash** (sudah ada `ssh` & `scp`), PostgreSQL 16 lokal (sudah terpasang),
 dan kode terbaru sudah di-*push* ke GitHub.
 
 ---
@@ -43,9 +43,9 @@ Cek (bisa butuh 5–60 menit): `nslookup dinasacademy.com` harus menampilkan IP 
 
 ## 3. Masuk ke server
 
-Di PowerShell komputer Anda:
+Di Git Bash komputer Anda:
 
-```powershell
+```bash
 ssh root@IP_SERVER
 ```
 
@@ -108,10 +108,10 @@ Tabel database dibuat otomatis oleh migrasi saat backend start.
 
 ## 8. Pindahkan database lokal ke server
 
-**a. Di komputer Anda (PowerShell)** — buat backup:
+**a. Di komputer Anda (Git Bash)** — buat backup:
 
-```powershell
-& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -h localhost -U postgres -d dinasacademy -Fc -f dinasacademy.dump
+```bash
+"/c/Program Files/PostgreSQL/16/bin/pg_dump.exe" -h localhost -U postgres -d dinasacademy -Fc -f dinasacademy.dump
 scp dinasacademy.dump root@IP_SERVER:/opt/dinasacademy/
 ```
 
