@@ -120,31 +120,34 @@ rm dinasacademy.dump
 > aplikasi bank digital) biasanya diterima — tidak harus kartu kredit. Selama Instance Type **Free**,
 > tidak ada tagihan bulanan.
 
-## Langkah 4 — Website di Cloudflare Pages
+## Langkah 4 — Website di Cloudflare Workers
+
+Cloudflare kini membuat website lewat **Workers** (menu Pages tidak selalu tersedia). Konfigurasinya
+sudah ada di `frontend/wrangler.jsonc` (termasuk agar refresh di `/hasil` dll. tidak 404).
 
 1. Buka [dash.cloudflare.com](https://dash.cloudflare.com) → daftar/masuk.
-2. **Workers & Pages** → **Create** → tab **Pages** → **Connect to Git** → pilih repo `dinasacademy`.
+2. **Workers & Pages** → **Create** → **Import a repository** (Connect to Git) → pilih repo `dinasacademy`.
 3. Pengaturan build:
 
    | Isian | Nilai |
    |---|---|
-   | Project name | `dinasacademy` → alamat menjadi `https://dinasacademy.pages.dev` |
+   | Project name | `dinasacademy` (harus sama dengan `name` di `frontend/wrangler.jsonc`) |
    | Production branch | `main` |
-   | Framework preset | `Vite` (atau *None*) |
-   | Root directory | `frontend` |
+   | Root directory / Path | `frontend` |
    | Build command | `npm run build` |
-   | Build output directory | `dist` |
+   | Deploy command | `npx wrangler deploy` |
 
-4. **Environment variables** (Production):
+4. **Build variables** (Settings → Build → *Variables and secrets*; bukan variabel runtime):
 
    | Nama | Nilai |
    |---|---|
-   | `VITE_API_URL` | `https://dinasacademy-api.onrender.com/api` (alamat backend langkah 3 + `/api`) |
+   | `VITE_API_URL` | alamat backend langkah 3 + `/api`, mis. `https://dinasacademy.onrender.com/api` |
    | `NODE_VERSION` | `20` |
 
-5. **Save and Deploy** (± 2–3 menit).
-6. Bila alamat website berbeda dari `https://dinasacademy.pages.dev`, ubah `FRONTEND_URL` di
-   Render → service → **Environment** → simpan (Render deploy ulang otomatis).
+5. **Deploy** (± 2–3 menit). Alamat website: `https://dinasacademy.<subdomain-akun>.workers.dev`
+   (subdomain akun bisa diganti di Workers & Pages → *Subdomain* → **Change**).
+6. Isi `FRONTEND_URL` di Render → service → **Environment** dengan alamat website tersebut persis
+   (tanpa `/` di akhir) → simpan (Render deploy ulang otomatis).
 
 ## Langkah 5 — Cegah backend "tidur" (gratis)
 
