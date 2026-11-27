@@ -47,6 +47,9 @@ Semua perintah di panduan ini untuk terminal **Git Bash**, dijalankan dari folde
 > (`&`, `?`, `!`, `$`) di connection string atau password tidak diubah oleh Bash.
 
 ```bash
+# Pastikan berada di folder proyek (cek dengan: pwd)
+cd "/c/Kerja/Ambil pena/New folder/dinasacademy"
+
 # a. Backup database lokal (diminta password PostgreSQL laptop)
 "/c/Program Files/PostgreSQL/16/bin/pg_dump.exe" -h localhost -U postgres -d dinasacademy -Fc -f dinasacademy.dump
 
@@ -67,7 +70,9 @@ npm run reset:participants -- --yes     # hapus akun uji beserta pesanan & hasil
 
 # d. PENTING: hapus variabel agar backend lokal kembali memakai database laptop
 unset DATABASE_URL ADMIN_PASSWORD
-cd ..
+
+# e. Hapus file backup (berisi data pengguna) setelah restore ke Neon berhasil
+cd "/c/Kerja/Ambil pena/New folder/dinasacademy"
 rm dinasacademy.dump
 ```
 
