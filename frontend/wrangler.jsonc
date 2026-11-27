@@ -1,0 +1,13 @@
+// Konfigurasi Cloudflare Workers (static assets) untuk website Dinas Academy.
+// Workers Builds: Root directory = frontend, Build command = npm run build,
+// Deploy command = npx wrangler deploy. VITE_API_URL diisi di Settings → Build → Variables.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dinasacademy",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // React Router: alamat seperti /hasil atau /admin/tryouts dilayani index.html (tanpa 404)
+    "not_found_handling": "single-page-application"
+  }
+}
