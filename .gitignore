@@ -4,3 +4,4 @@ dist/
 scripts/.cache-snpmb/
 backups/
 *.dump
+*.tsbuildinfo
